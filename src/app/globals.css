@@ -1,22 +1,69 @@
 @import "tailwindcss";
 
 :root {
-  --background: #07080d;
-  --foreground: #ededed;
+  /* Base palette — change these two to retheme the whole app. Everything else
+     references the semantic tokens below, never raw white/black. */
+  --base-background: #101014;
+  --base-foreground: #e9e7e0;
+
+  /* Semantic tokens. The result step overrides --foreground/--accent inline with
+     the winning species' color (the "theme takeover"); resetting the quiz simply
+     removes the override and these defaults win again. */
+  --background: var(--base-background);
+  --foreground: var(--base-foreground);
+  --accent: var(--base-foreground);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-bricolage);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   /* Dark cosmic backdrop: a faint glow above a near-black field. */
   background:
-    radial-gradient(120% 80% at 50% -10%, #1a2036 0%, transparent 55%),
+    radial-gradient(120% 80% at 50% -10%, #171b28 0%, transparent 55%),
     var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Starscape. Stars use --foreground so the species takeover tints the sky too. */
+.star {
+  position: absolute;
+  border-radius: 9999px;
+  background: var(--foreground);
+  transition: background-color 0.7s;
+  animation:
+    star-twinkle var(--twinkle, 4s) ease-in-out var(--delay, 0s) infinite,
+    star-drift var(--drift, 14s) ease-in-out var(--delay, 0s) infinite alternate;
+}
+
+@keyframes star-twinkle {
+  0%,
+  100% {
+    opacity: var(--o, 0.5);
+  }
+  50% {
+    opacity: calc(var(--o, 0.5) * 0.25);
+  }
+}
+
+@keyframes star-drift {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 0 -12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star {
+    animation: none;
+    opacity: var(--o, 0.5);
+  }
 }
