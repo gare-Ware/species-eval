@@ -9,9 +9,9 @@ import type { Variants } from 'motion/react';
 // stretch correction stays small enough not to distort the glyphs.
 // The question mark deliberately lives in the blob, not here.
 const LINES = [
-  { text: 'WHAT', fontSize: 318, height: 240, baseline: 232 },
-  { text: 'SPECIES', fontSize: 248, height: 188, baseline: 181 },
-  { text: 'ARE YOU', fontSize: 228, height: 172, baseline: 166 },
+  { text: 'What', fontSize: 318, height: 240, baseline: 232 },
+  { text: 'Species', fontSize: 248, height: 188, baseline: 181 },
+  { text: 'Are You', fontSize: 228, height: 172, baseline: 166 },
 ];
 
 const container: Variants = {
