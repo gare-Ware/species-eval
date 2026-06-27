@@ -7,7 +7,7 @@ import type { Transition } from 'motion/react';
 //
 // Usage: wrap a transition — `transition={slow({ type: 'spring', ... })}`.
 // Reset to 1 before committing. The wrappers are harmless at 1, so they can stay.
-export const SLOWMO: number = 5; // 1 = real time · 5 ≈ the ~2s slow-mo for analysis
+export const SLOWMO: number = 1; // 1 = real time · 5 ≈ the ~2s slow-mo for analysis
 
 const TIME_KEYS = new Set([
   'duration',

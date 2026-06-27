@@ -4,6 +4,7 @@ import { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
 import { slow } from '@/lib/slowmo';
+import { GLIDE } from '@/lib/motion';
 
 // Poster-stacked headline. Each line is its own tiny SVG: `textLength` forces
 // every line to fill the exact same measure (true magazine justification, which
@@ -19,28 +20,37 @@ const LINES = [
 const container: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
-  // Exit re-staggers top-down so the stack peels away line by line.
-  exit: { transition: slow({ staggerChildren: 0.05 }) },
+  // Exit peels bottom-up (staggerDirection -1): the line nearest the blob leaves
+  // FIRST, so the blob rises into already-vacated space instead of catching the
+  // still-frozen line above it (top-down stagger left that line sitting there
+  // ~0.12s while the blob glided up into it). The big-travel lines also outrun
+  // the blob, so the header clears as the blob rises — together, no overlap.
+  exit: { transition: slow({ staggerChildren: 0.04, staggerDirection: -1 }) },
 };
 
 const line: Variants = {
-  hidden: { y: 30, opacity: 0 },
+  // Enter from above, mirroring the upward exit — the lines drop into place from
+  // off the top. The larger travel makes the entrance a visible *slide* on both
+  // first load and retake; the old 30px move was so small it read as a pop/fade.
+  // Coming from above also keeps the lines clear of the blob on the way in.
+  hidden: { y: -200, opacity: 0 },
+  // Enter on the shared GLIDE so, on the reverse flows (result/retake → start),
+  // the header settles in step with the blob gliding back down — not racing
+  // ahead of it (which read as "appears much earlier" than the blob).
   show: {
     y: 0,
     opacity: 1,
-    transition: { type: 'spring', stiffness: 520, damping: 42 },
+    transition: GLIDE,
   },
-  // Slide the line away upward. popLayout pops the header out of flow at the same
-  // time, so the blob glides up to fill the gap as the line leaves. Opacity holds
-  // until the tail of the slide, so it reads as "sliding away", not a crossfade.
+  // Slide the line clear of the viewport top on the same GLIDE the blob rides
+  // up — they travel together. popLayout pops the header out of flow so the blob
+  // glides up into the gap. The travel is large enough to fully leave the screen,
+  // and opacity holds through the slide and only fades at the tail, so it reads
+  // as sliding off, not dissolving.
   exit: {
-    y: -160,
+    y: -520,
     opacity: 0,
-    transition: slow({
-      duration: 0.2,
-      ease: 'easeIn',
-      opacity: { delay: 0.1, duration: 0.1 },
-    }),
+    transition: { ...GLIDE, opacity: slow({ delay: 0.3, duration: 0.18 }) },
   },
 };
 
