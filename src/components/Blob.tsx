@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import type { Species } from '@/data/species';
+import { slow } from '@/lib/slowmo';
 import { SpeciesGlyph } from './SpeciesGlyph';
 
 export type Step = 'start' | 'quiz' | 'result';
@@ -31,7 +32,7 @@ export function Blob({ step, species, onBegin }: BlobProps) {
       animate={{ width: SIZE[step], height: SIZE[step] }}
       // Lower damping on the reveal gives the size jump a springy overshoot —
       // that bounce *is* the "blob pulses" beat of the reveal sequence.
-      transition={{ type: 'spring', stiffness: 320, damping: step === 'result' ? 16 : 26 }}
+      transition={slow({ type: 'spring', stiffness: 320, damping: step === 'result' ? 16 : 26 })}
       whileHover={interactive ? { scale: 1.06 } : undefined}
       whileTap={interactive ? { scale: 0.93 } : undefined}
       className="relative shrink-0 rounded-full bg-accent transition-colors duration-700 [container-type:size] enabled:cursor-pointer"

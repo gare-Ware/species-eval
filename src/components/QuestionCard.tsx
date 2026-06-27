@@ -3,6 +3,7 @@
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
 import type { Option, Question } from '@/data/questions';
+import { slow } from '@/lib/slowmo';
 
 interface QuestionCardProps {
   question: Question;
@@ -19,14 +20,14 @@ const card: Variants = {
   show: {
     opacity: 1,
     y: 0,
-    transition: {
+    transition: slow({
       type: 'spring',
       stiffness: 480,
       damping: 40,
       staggerChildren: 0.05,
-    },
+    }),
   },
-  exit: { opacity: 0, y: -28, transition: { duration: 0.18, ease: 'easeIn' } },
+  exit: { opacity: 0, y: -28, transition: slow({ duration: 0.18, ease: 'easeIn' }) },
 };
 
 const item: Variants = {
@@ -34,7 +35,7 @@ const item: Variants = {
   show: {
     y: 0,
     opacity: 1,
-    transition: { type: 'spring', stiffness: 480, damping: 38 },
+    transition: slow({ type: 'spring', stiffness: 480, damping: 38 }),
   },
 };
 

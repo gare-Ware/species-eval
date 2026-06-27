@@ -2,6 +2,7 @@
 
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
+import { slow } from '@/lib/slowmo';
 
 // Poster-stacked headline. Each line is its own tiny SVG: `textLength` forces
 // every line to fill the exact same measure (true magazine justification, which
@@ -18,7 +19,7 @@ const container: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
   // Exit re-staggers top-down so the stack peels away line by line.
-  exit: { transition: { staggerChildren: 0.05 } },
+  exit: { transition: slow({ staggerChildren: 0.05 }) },
 };
 
 const line: Variants = {
@@ -31,7 +32,7 @@ const line: Variants = {
   exit: {
     y: -36,
     opacity: 0,
-    transition: { duration: 0.2, ease: 'easeIn' },
+    transition: slow({ duration: 0.2, ease: 'easeIn' }),
   },
 };
 
