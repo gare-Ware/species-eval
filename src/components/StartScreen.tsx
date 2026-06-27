@@ -1,5 +1,6 @@
 'use client';
 
+import { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
 import { slow } from '@/lib/slowmo';
@@ -29,16 +30,28 @@ const line: Variants = {
     opacity: 1,
     transition: { type: 'spring', stiffness: 520, damping: 42 },
   },
+  // Slide the line away upward. popLayout pops the header out of flow at the same
+  // time, so the blob glides up to fill the gap as the line leaves. Opacity holds
+  // until the tail of the slide, so it reads as "sliding away", not a crossfade.
   exit: {
-    y: -36,
+    y: -160,
     opacity: 0,
-    transition: slow({ duration: 0.2, ease: 'easeIn' }),
+    transition: slow({
+      duration: 0.2,
+      ease: 'easeIn',
+      opacity: { delay: 0.1, duration: 0.1 },
+    }),
   },
 };
 
-export function StartScreen() {
+// forwardRef is required for AnimatePresence mode="popLayout": Motion pops the
+// exiting header out of flow by measuring it through this ref. Without it Motion
+// can't pop the header, so it keeps its layout space until it unmounts — and the
+// content jumps to fill the gap instead of filling smoothly during the peel.
+export const StartScreen = forwardRef<HTMLElement>(function StartScreen(_props, ref) {
   return (
     <motion.header
+      ref={ref}
       className="flex w-full flex-col gap-2"
       variants={container}
       initial="hidden"
@@ -74,4 +87,4 @@ export function StartScreen() {
       ))}
     </motion.header>
   );
-}
+});

@@ -85,6 +85,7 @@ export function Quiz() {
               index={index}
               total={questions.length}
               onAnswer={handleAnswer}
+              reveal={index === 0}
             />
           )}
           {step === 'result' && winner && (

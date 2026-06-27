@@ -10,25 +10,15 @@ interface QuestionCardProps {
   index: number; // 0-based
   total: number;
   onAnswer: (option: Option) => void;
+  /**
+   * True only for the first card after the start screen. It grows in from
+   * height 0 so the stack's re-center is a smooth ramp instead of a jump (which
+   * was teleporting the blob's glide target mid-flight). Later cards must NOT do
+   * this — they're re-keyed per question, so growing each from 0 would bob the
+   * blob on every answer — so they keep the lighter opacity+y swap below.
+   */
+  reveal?: boolean;
 }
-
-// Vertical rise + fade: the outgoing question drifts up toward the blob, the
-// next one rises in from below. The orchestrator keys this component by question
-// id inside <AnimatePresence mode="wait">, so exit fully plays before enter.
-const card: Variants = {
-  hidden: { opacity: 0, y: 28 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: slow({
-      type: 'spring',
-      stiffness: 480,
-      damping: 40,
-      staggerChildren: 0.05,
-    }),
-  },
-  exit: { opacity: 0, y: -28, transition: slow({ duration: 0.18, ease: 'easeIn' }) },
-};
 
 const item: Variants = {
   hidden: { opacity: 0, y: 14 },
@@ -39,10 +29,31 @@ const item: Variants = {
   },
 };
 
-export function QuestionCard({ question, index, total, onAnswer }: QuestionCardProps) {
+export function QuestionCard({ question, index, total, onAnswer, reveal = false }: QuestionCardProps) {
+  // Reveal grows from height 0 (overflow clipped so content unfurls); the height
+  // spring is the column-growth driver, so keep it near the blob's glide spring
+  // (Blob.tsx) and tune the two together. Non-reveal cards drift up + fade.
+  const card: Variants = {
+    hidden: reveal ? { opacity: 0, height: 0 } : { opacity: 0, y: 28 },
+    show: {
+      opacity: 1,
+      y: 0,
+      ...(reveal ? { height: 'auto' } : {}),
+      transition: slow({
+        type: 'spring',
+        stiffness: 480,
+        damping: 40,
+        opacity: { duration: 0.25 },
+        staggerChildren: 0.05,
+        delayChildren: reveal ? 0.12 : 0,
+      }),
+    },
+    exit: { opacity: 0, y: -28, transition: slow({ duration: 0.18, ease: 'easeIn' }) },
+  };
+
   return (
     <motion.section
-      className="flex w-full flex-col gap-6"
+      className={`flex w-full flex-col gap-6${reveal ? ' overflow-hidden' : ''}`}
       variants={card}
       initial="hidden"
       animate="show"
