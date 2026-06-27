@@ -7,6 +7,7 @@ import type { Option } from '@/data/questions';
 import { questions } from '@/data/questions';
 import { getSpecies } from '@/data/species';
 import { scoreQuiz } from '@/lib/scoring';
+import { slow } from '@/lib/slowmo';
 import { Starscape } from './Starscape';
 import { Blob } from './Blob';
 import type { Step } from './Blob';
@@ -71,7 +72,7 @@ export function Quiz() {
               key="hint"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, transition: { delay: 0.5 } }}
-              exit={{ opacity: 0, transition: { duration: 0.15 } }}
+              exit={{ opacity: 0, transition: slow({ duration: 0.15 }) }}
               className="font-mono text-xs uppercase tracking-[0.3em] text-foreground/40"
             >
               Tap to begin · {questions.length} questions
