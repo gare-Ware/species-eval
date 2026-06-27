@@ -8,6 +8,7 @@ import { questions } from '@/data/questions';
 import { getSpecies } from '@/data/species';
 import { scoreQuiz } from '@/lib/scoring';
 import { slow } from '@/lib/slowmo';
+import { GLIDE } from '@/lib/motion';
 import { Starscape } from './Starscape';
 import { Blob } from './Blob';
 import type { Step } from './Blob';
@@ -66,18 +67,25 @@ export function Quiz() {
 
         <Blob step={step} species={winner} onBegin={() => reset('quiz')} />
 
-        <AnimatePresence mode="wait">
+        {/* The hint gets its own popLayout island so its exit is independent of
+            the content swap below: popped out of flow, it slides down and fades
+            as the blob glides up — instead of being yanked upward by the
+            re-centering column (which read as a jump behind the blob). */}
+        <AnimatePresence mode="popLayout">
           {step === 'start' && (
             <motion.p
               key="hint"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, transition: { delay: 0.5 } }}
-              exit={{ opacity: 0, transition: slow({ duration: 0.15 }) }}
+              exit={{ y: 80, opacity: 0, transition: { ...GLIDE, opacity: slow({ duration: 0.12 }) } }}
               className="font-mono text-xs uppercase tracking-[0.3em] text-foreground/40"
             >
               Tap to begin · {questions.length} questions
             </motion.p>
           )}
+        </AnimatePresence>
+
+        <AnimatePresence mode="wait">
           {step === 'quiz' && (
             <QuestionCard
               key={questions[index].id}

@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import type { Species } from '@/data/species';
 import { slow } from '@/lib/slowmo';
+import { GLIDE } from '@/lib/motion';
 import { SpeciesGlyph } from './SpeciesGlyph';
 
 export type Step = 'start' | 'quiz' | 'result';
@@ -30,9 +31,14 @@ export function Blob({ step, species, onBegin }: BlobProps) {
       disabled={!interactive}
       onClick={interactive ? onBegin : undefined}
       animate={{ width: SIZE[step], height: SIZE[step] }}
-      // Lower damping on the reveal gives the size jump a springy overshoot —
-      // that bounce *is* the "blob pulses" beat of the reveal sequence.
-      transition={slow({ type: 'spring', stiffness: 320, damping: step === 'result' ? 16 : 26 })}
+      // Size: lower damping on the result reveal gives the size jump a springy
+      // overshoot — that bounce *is* the "blob pulses" beat of the reveal.
+      // Position: the `layout` glide is pinned to the shared GLIDE so the blob
+      // and the start-chrome (headline, hint) travel on the same spring.
+      transition={{
+        ...slow({ type: 'spring', stiffness: 320, damping: step === 'result' ? 16 : 26 }),
+        layout: GLIDE,
+      }}
       whileHover={interactive ? { scale: 1.06 } : undefined}
       whileTap={interactive ? { scale: 0.93 } : undefined}
       className="relative shrink-0 rounded-full bg-accent transition-colors duration-700 [container-type:size] enabled:cursor-pointer"
