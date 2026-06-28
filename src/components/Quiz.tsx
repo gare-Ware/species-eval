@@ -1,14 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import type { Option } from '@/data/questions';
 import { questions } from '@/data/questions';
 import { getSpecies } from '@/data/species';
 import { scoreQuiz } from '@/lib/scoring';
-import { slow } from '@/lib/slowmo';
+import { slow, SLOWMO } from '@/lib/slowmo';
 import { GLIDE } from '@/lib/motion';
+
+// The "thinking beat": once the answered card has slid away and the blob has
+// enlarged + recentered, hold the empty centered blob this long before winding
+// up the next question. Scaled by SLOWMO so the dev toggle stretches it too.
+const THINK_DWELL_MS = 350;
 import { Starscape } from './Starscape';
 import { Blob } from './Blob';
 import type { Step } from './Blob';
@@ -27,6 +32,9 @@ export function Quiz() {
   // result glides off, then released once it's gone (see reset + onExitComplete),
   // so the result leaves before the start screen arrives instead of being shoved.
   const [landingReady, setLandingReady] = useState(true);
+  // Holds the pending wind-up while the blob "thinks". Cleared on unmount.
+  const thinkTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(thinkTimer.current), []);
 
   const winner = step === 'result' ? getSpecies(scoreQuiz(answers).winnerId) : null;
 
@@ -52,13 +60,22 @@ export function Quiz() {
     if (nextStep === 'start') setLandingReady(false);
   }
 
+  // Route every answer through the centered 'thinking' beat: the answered card
+  // leaves the content presence (exits downward) and the blob enlarges in place.
+  // advance() then winds up the next question — see the content onExitComplete.
   function handleAnswer(option: Option) {
-    const next = [...answers, option];
-    setAnswers(next);
-    if (index + 1 < questions.length) {
-      setIndex(index + 1);
-    } else {
+    setAnswers([...answers, option]);
+    setStep('thinking');
+  }
+
+  // Wind up out of the thinking beat. Derives the target from answers.length
+  // (already includes the just-answered option), so no separate pending state.
+  function advance() {
+    if (answers.length >= questions.length) {
       setStep('result');
+    } else {
+      setIndex(answers.length);
+      setStep('quiz');
     }
   }
 
@@ -95,7 +112,23 @@ export function Quiz() {
           )}
         </AnimatePresence>
 
-        <AnimatePresence mode="wait" onExitComplete={() => setLandingReady(true)}>
+        {/* One content island. The answered card stays in flow while it leaves —
+            its shell height collapses to 0 (QuestionCard), re-centering the
+            column so the blob glides down as the card slides off-screen. The
+            result re-uses this island for the committed retake handoff. */}
+        <AnimatePresence
+          mode="wait"
+          onExitComplete={() => {
+            // Thinking beat: the answered card has gone — hold the enlarged blob a
+            // moment, then wind up the next question/result.
+            if (step === 'thinking') {
+              thinkTimer.current = setTimeout(advance, THINK_DWELL_MS * SLOWMO);
+            } else if (step === 'start') {
+              // Retake: result has glided off — release the landing chrome.
+              setLandingReady(true);
+            }
+          }}
+        >
           {step === 'quiz' && (
             <QuestionCard
               key={questions[index].id}
