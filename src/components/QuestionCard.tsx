@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
 import type { Option, Question } from '@/data/questions';
@@ -30,6 +31,11 @@ const item: Variants = {
 };
 
 export function QuestionCard({ question, index, total, onAnswer, reveal = false }: QuestionCardProps) {
+  // Clip only while the first card grows in from height 0. A persistent clip
+  // cropped the option buttons' hover scale at the card edges, so it's released
+  // (below) once the grow-in finishes.
+  const [clip, setClip] = useState(reveal);
+
   // Reveal grows from height 0 (overflow clipped so content unfurls); the height
   // spring is the column-growth driver, so keep it near the blob's glide spring
   // (Blob.tsx) and tune the two together. Non-reveal cards drift up + fade.
@@ -53,11 +59,14 @@ export function QuestionCard({ question, index, total, onAnswer, reveal = false 
 
   return (
     <motion.section
-      className={`flex w-full flex-col gap-6${reveal ? ' overflow-hidden' : ''}`}
+      className={`flex w-full flex-col gap-6${clip ? ' overflow-hidden' : ''}`}
       variants={card}
       initial="hidden"
       animate="show"
       exit="exit"
+      // Release the grow-in clip once the reveal settles, so the buttons' hover
+      // scale isn't cropped at the card edges for the life of the first question.
+      onAnimationComplete={() => setClip(false)}
     >
       <div className="flex items-center justify-between font-mono text-xs uppercase tracking-[0.2em] text-foreground/40">
         <span>

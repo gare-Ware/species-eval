@@ -17,23 +17,28 @@ const LINES = [
   { text: 'Are You', fontSize: 228, height: 172, baseline: 166 },
 ];
 
+// Per-line peel stagger. 0 = the lines glide in and out in unison (the staggered
+// version read as too lopsided — the bottom lines moved well before the top one
+// did). Bump this (e.g. 0.05) to bring the line-by-line peel back; exit keeps
+// staggerDirection -1 so that peel runs bottom-up and clears the blob first.
+const STAGGER = 0;
+
 const container: Variants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
-  // Exit peels bottom-up (staggerDirection -1): the line nearest the blob leaves
-  // FIRST, so the blob rises into already-vacated space instead of catching the
-  // still-frozen line above it (top-down stagger left that line sitting there
-  // ~0.12s while the blob glided up into it). The big-travel lines also outrun
-  // the blob, so the header clears as the blob rises — together, no overlap.
-  exit: { transition: slow({ staggerChildren: 0.04, staggerDirection: -1 }) },
+  show: { transition: { staggerChildren: STAGGER, delayChildren: 0.05 } },
+  exit: { transition: slow({ staggerChildren: STAGGER, staggerDirection: -1 }) },
 };
 
 const line: Variants = {
-  // Enter from above, mirroring the upward exit — the lines drop into place from
-  // off the top. The larger travel makes the entrance a visible *slide* on both
-  // first load and retake; the old 30px move was so small it read as a pop/fade.
-  // Coming from above also keeps the lines clear of the blob on the way in.
-  hidden: { y: -200, opacity: 0 },
+  // Enter from fully off the top, opaque (no fade) — the whole stack slides down
+  // into place as one unit, so it reads as arriving from off-screen instead of
+  // fading in. With STAGGER at 0 the uniform offset keeps the lines' spacing
+  // constant, so it's a clean block slide with no line-crossing. The travel must
+  // carry the *bottom* line above the viewport top: there's no fade here to hide
+  // a partial clear (unlike exit), so it runs larger than the exit and is sized
+  // for tall viewports. Same downward-from-the-top direction as the exit
+  // reversed, so on retake the header returns from where it left.
+  hidden: { y: -760, opacity: 1 },
   // Enter on the shared GLIDE so, on the reverse flows (result/retake → start),
   // the header settles in step with the blob gliding back down — not racing
   // ahead of it (which read as "appears much earlier" than the blob).

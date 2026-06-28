@@ -23,6 +23,10 @@ export function Quiz() {
   const [step, setStep] = useState<Step>('start');
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Option[]>([]);
+  // Gates the landing chrome (headline + hint) on retake: held false while the
+  // result glides off, then released once it's gone (see reset + onExitComplete),
+  // so the result leaves before the start screen arrives instead of being shoved.
+  const [landingReady, setLandingReady] = useState(true);
 
   const winner = step === 'result' ? getSpecies(scoreQuiz(answers).winnerId) : null;
 
@@ -41,6 +45,11 @@ export function Quiz() {
     setStep(nextStep);
     setIndex(0);
     setAnswers([]);
+    // On retake (→ start), hold the landing chrome back until the result has
+    // glided off — released in the content AnimatePresence's onExitComplete — so
+    // the species card clearly leaves first, instead of being shoved down by the
+    // headline and hint as they enter.
+    if (nextStep === 'start') setLandingReady(false);
   }
 
   function handleAnswer(option: Option) {
@@ -62,22 +71,23 @@ export function Quiz() {
             blob starts its layout glide upward while the lines are still
             peeling away — one motion instead of two queued ones. */}
         <AnimatePresence mode="popLayout">
-          {step === 'start' && <StartScreen key="headline" />}
+          {step === 'start' && landingReady && <StartScreen key="headline" />}
         </AnimatePresence>
 
         <Blob step={step} species={winner} onBegin={() => reset('quiz')} />
 
-        {/* The hint gets its own popLayout island so its exit is independent of
-            the content swap below: popped out of flow, it slides down and fades
-            as the blob glides up — instead of being yanked upward by the
-            re-centering column (which read as a jump behind the blob). */}
+        {/* The hint gets its own popLayout island so its motion is independent of
+            the content swap below. It's opaque and starts/ends fully off the
+            bottom (mirroring the header off the top), so it reads as sliding in
+            from off-screen and back out — no fade — and comes back from where it
+            left. Tail-fade on exit is only a safety net for short viewports. */}
         <AnimatePresence mode="popLayout">
-          {step === 'start' && (
+          {step === 'start' && landingReady && (
             <motion.p
               key="hint"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1, transition: { delay: 0.5 } }}
-              exit={{ y: 80, opacity: 0, transition: { ...GLIDE, opacity: slow({ duration: 0.12 }) } }}
+              initial={{ y: 520, opacity: 1 }}
+              animate={{ y: 0, opacity: 1, transition: GLIDE }}
+              exit={{ y: 520, opacity: 0, transition: { ...GLIDE, opacity: slow({ delay: 0.3, duration: 0.18 }) } }}
               className="font-mono text-xs uppercase tracking-[0.3em] text-foreground/40"
             >
               Tap to begin · {questions.length} questions
@@ -85,7 +95,7 @@ export function Quiz() {
           )}
         </AnimatePresence>
 
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" onExitComplete={() => setLandingReady(true)}>
           {step === 'quiz' && (
             <QuestionCard
               key={questions[index].id}
