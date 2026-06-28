@@ -92,8 +92,15 @@ export function QuestionCard({ question, index, total, onAnswer, reveal = false 
     // shell's animated height. That way the gap collapses with the height on exit
     // and there's no residual 40px to vanish — and jolt the blob ~20px — when the
     // card finally unmounts.
+    //
+    // Width runs 1rem wider than the column with px-2 to match, so the content
+    // still sits at full column width but the unfurl clip (overflow-hidden, first
+    // card only) sits 8px outside each edge — room for the option buttons' hover
+    // scale to grow without being cropped at the card's sides. CSS can't clip one
+    // axis alone, so we give the clipped axis horizontal slack instead. The
+    // 8px/side spills harmlessly into the page padding.
     <motion.div
-      className={`-mt-10 w-full${clip ? ' overflow-hidden' : ''}`}
+      className={`-mt-10 w-[calc(100%+1rem)] px-2${clip ? ' overflow-hidden' : ''}`}
       variants={shell}
       initial="hidden"
       animate="show"
