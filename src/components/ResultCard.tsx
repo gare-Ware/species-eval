@@ -3,6 +3,7 @@
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
 import type { Species } from '@/data/species';
+import { slow } from '@/lib/slowmo';
 
 interface ResultCardProps {
   species: Species;
@@ -23,7 +24,14 @@ interface ResultCardProps {
 const container: Variants = {
   hidden: {},
   show: { transition: { delayChildren: 0.55, staggerChildren: 0.11 } },
-  exit: { opacity: 0, transition: { duration: 0.18 } },
+  // Retake: glide the whole card down and off, then fade. The landing chrome is
+  // held back until this finishes (see Quiz), so the result clearly leaves before
+  // the start screen arrives — instead of fading in place or jumping.
+  exit: {
+    opacity: 0,
+    y: 220,
+    transition: slow({ duration: 0.35, ease: 'easeIn', opacity: { duration: 0.28 } }),
+  },
 };
 
 const item: Variants = {
