@@ -1,30 +1,105 @@
-interface StartScreenProps {
-  questionCount: number;
-  onBegin: () => void;
-}
+'use client';
 
-// One of three mountable steps in the quiz flow. Kept as a self-contained unit so
-// Phase 2 can wrap the step swap in AnimatePresence without restructuring.
-export function StartScreen({ questionCount, onBegin }: StartScreenProps) {
+import { forwardRef } from 'react';
+import { motion } from 'motion/react';
+import type { Variants } from 'motion/react';
+import { slow } from '@/lib/slowmo';
+import { GLIDE } from '@/lib/motion';
+
+// Poster-stacked headline. Each line is its own tiny SVG: `textLength` forces
+// every line to fill the exact same measure (true magazine justification, which
+// CSS alone can't do), and the per-line font sizes below are tuned so the
+// stretch correction stays small enough not to distort the glyphs.
+// The question mark deliberately lives in the blob, not here.
+const LINES = [
+  { text: 'What', fontSize: 318, height: 240, baseline: 232 },
+  { text: 'Species', fontSize: 248, height: 188, baseline: 181 },
+  { text: 'Are You', fontSize: 228, height: 172, baseline: 166 },
+];
+
+// Per-line peel stagger. 0 = the lines glide in and out in unison (the staggered
+// version read as too lopsided — the bottom lines moved well before the top one
+// did). Bump this (e.g. 0.05) to bring the line-by-line peel back; exit keeps
+// staggerDirection -1 so that peel runs bottom-up and clears the blob first.
+const STAGGER = 0;
+
+const container: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: STAGGER, delayChildren: 0.05 } },
+  exit: { transition: slow({ staggerChildren: STAGGER, staggerDirection: -1 }) },
+};
+
+const line: Variants = {
+  // Enter from fully off the top, opaque (no fade) — the whole stack slides down
+  // into place as one unit, so it reads as arriving from off-screen instead of
+  // fading in. With STAGGER at 0 the uniform offset keeps the lines' spacing
+  // constant, so it's a clean block slide with no line-crossing. The travel must
+  // carry the *bottom* line above the viewport top: there's no fade here to hide
+  // a partial clear (unlike exit), so it runs larger than the exit and is sized
+  // for tall viewports. Same downward-from-the-top direction as the exit
+  // reversed, so on retake the header returns from where it left.
+  hidden: { y: -760, opacity: 1 },
+  // Enter on the shared GLIDE so, on the reverse flows (result/retake → start),
+  // the header settles in step with the blob gliding back down — not racing
+  // ahead of it (which read as "appears much earlier" than the blob).
+  show: {
+    y: 0,
+    opacity: 1,
+    transition: GLIDE,
+  },
+  // Slide the line clear of the viewport top on the same GLIDE the blob rides
+  // up — they travel together. popLayout pops the header out of flow so the blob
+  // glides up into the gap. The travel is large enough to fully leave the screen,
+  // and opacity holds through the slide and only fades at the tail, so it reads
+  // as sliding off, not dissolving.
+  exit: {
+    y: -520,
+    opacity: 0,
+    transition: { ...GLIDE, opacity: slow({ delay: 0.3, duration: 0.18 }) },
+  },
+};
+
+// forwardRef is required for AnimatePresence mode="popLayout": Motion pops the
+// exiting header out of flow by measuring it through this ref. Without it Motion
+// can't pop the header, so it keeps its layout space until it unmounts — and the
+// content jumps to fill the gap instead of filling smoothly during the peel.
+export const StartScreen = forwardRef<HTMLElement>(function StartScreen(_props, ref) {
   return (
-    <section className="flex flex-col items-center gap-6 text-center">
-      <p className="text-xs uppercase tracking-[0.3em] text-white/40">
-        A personality quiz
-      </p>
-      <h1 className="text-4xl font-semibold sm:text-5xl">
-        What Alien Species Are You?
-      </h1>
-      <p className="max-w-md text-balance text-white/60">
-        {questionCount} quick questions, one deeply unscientific verdict on which
-        visitor from the lore you most resemble.
-      </p>
-      <button
-        type="button"
-        onClick={onBegin}
-        className="mt-2 rounded-full bg-white px-8 py-3 font-medium text-black transition hover:bg-white/85"
+    <motion.header
+      ref={ref}
+      className="flex w-full flex-col gap-2"
+      variants={container}
+      initial="hidden"
+      animate="show"
+      exit="exit"
+    >
+      <motion.p
+        variants={line}
+        className="mb-2 text-center font-mono text-xs uppercase tracking-[0.35em] text-foreground/40"
       >
-        Begin
-      </button>
-    </section>
+        An alien species evaluation
+      </motion.p>
+      {LINES.map(({ text, fontSize, height, baseline }) => (
+        <motion.div key={text} variants={line}>
+          <svg
+            viewBox={`0 0 1000 ${height}`}
+            className="block w-full"
+            role="presentation"
+          >
+            <text
+              x="0"
+              y={baseline}
+              textLength="1000"
+              lengthAdjust="spacingAndGlyphs"
+              fontSize={fontSize}
+              className="fill-foreground font-sans font-extrabold"
+              style={{ fontStretch: '92%' }}
+            >
+              {text}
+            </text>
+          </svg>
+        </motion.div>
+      ))}
+    </motion.header>
   );
-}
+});
