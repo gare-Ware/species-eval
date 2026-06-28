@@ -6,7 +6,7 @@ import { slow } from '@/lib/slowmo';
 import { GLIDE } from '@/lib/motion';
 import { SpeciesGlyph } from './SpeciesGlyph';
 
-export type Step = 'start' | 'quiz' | 'result';
+export type Step = 'start' | 'quiz' | 'thinking' | 'result';
 
 interface BlobProps {
   step: Step;
@@ -15,17 +15,26 @@ interface BlobProps {
   onBegin: () => void;
 }
 
-// One persistent element across all three steps — it never unmounts, it just
-// changes size (animate) and position (layout, when siblings come and go). That
-// continuity is what makes the flow read as one scene instead of three pages.
-const SIZE: Record<Step, number> = { start: 152, quiz: 64, result: 168 };
+// One persistent element across every step — it never unmounts, it just changes
+// size (animate) and position (layout, when siblings come and go). That
+// continuity is what makes the flow read as one scene instead of separate pages.
+// `thinking` is the between-question beat: the card empties out and the blob
+// enlarges + recenters here, so differing question heights never jump (see Quiz).
+const SIZE: Record<Step, number> = { start: 152, quiz: 64, thinking: 120, result: 168 };
 
 export function Blob({ step, species, onBegin }: BlobProps) {
   const interactive = step === 'start';
 
   return (
     <motion.button
-      layout
+      // Position-only layout glide: size is the explicit width/height animate
+      // below, so the projection only handles position (its GLIDE is shared with
+      // the start-chrome). This drives the blob on the step re-renders — start↔
+      // quiz↔result and the wind-up *up* out of the thinking beat. The *down*
+      // glide between questions is driven instead by the leaving card collapsing
+      // its height (QuestionCard), which re-centers the column under the blob —
+      // projection alone wasn't catching that re-center (blob sits above the gap).
+      layout="position"
       type="button"
       aria-label={interactive ? 'Begin the quiz' : undefined}
       disabled={!interactive}
