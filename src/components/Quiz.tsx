@@ -9,6 +9,7 @@ import { getSpecies } from '@/data/species';
 import { scoreQuiz } from '@/lib/scoring';
 import { slow, SLOWMO } from '@/lib/slowmo';
 import { GLIDE } from '@/lib/motion';
+import { useOffscreenTravel } from '@/lib/useOffscreenTravel';
 
 // The "thinking beat": once the answered card has slid away and the blob has
 // enlarged + recentered, hold the empty centered blob this long before winding
@@ -35,6 +36,11 @@ export function Quiz() {
   // Holds the pending wind-up while the blob "thinks". Cleared on unmount.
   const thinkTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(thinkTimer.current), []);
+
+  // Viewport-relative slide distance shared by every on/off-screen element (the
+  // header, the hint below, and the question cards) so none of them stop short of
+  // the edge on a larger display. Single source → they all travel in lockstep.
+  const travel = useOffscreenTravel();
 
   const winner = step === 'result' ? getSpecies(scoreQuiz(answers).winnerId) : null;
 
@@ -88,7 +94,7 @@ export function Quiz() {
             blob starts its layout glide upward while the lines are still
             peeling away — one motion instead of two queued ones. */}
         <AnimatePresence mode="popLayout">
-          {step === 'start' && landingReady && <StartScreen key="headline" />}
+          {step === 'start' && landingReady && <StartScreen key="headline" travel={travel} />}
         </AnimatePresence>
 
         <Blob step={step} species={winner} onBegin={() => reset('quiz')} />
@@ -102,9 +108,9 @@ export function Quiz() {
           {step === 'start' && landingReady && (
             <motion.p
               key="hint"
-              initial={{ y: 520, opacity: 1 }}
+              initial={{ y: travel, opacity: 1 }}
               animate={{ y: 0, opacity: 1, transition: GLIDE }}
-              exit={{ y: 520, opacity: 0, transition: { ...GLIDE, opacity: slow({ delay: 0.3, duration: 0.18 }) } }}
+              exit={{ y: travel, opacity: 0, transition: { ...GLIDE, opacity: slow({ delay: 0.3, duration: 0.18 }) } }}
               className="font-mono text-xs uppercase tracking-[0.3em] text-foreground/40"
             >
               Tap to begin · {questions.length} questions
@@ -136,6 +142,7 @@ export function Quiz() {
               index={index}
               total={questions.length}
               onAnswer={handleAnswer}
+              travel={travel}
             />
           )}
           {step === 'result' && winner && (
