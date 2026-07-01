@@ -29,41 +29,36 @@ const container: Variants = {
   exit: { transition: slow({ staggerChildren: STAGGER, staggerDirection: -1 }) },
 };
 
-const line: Variants = {
-  // Enter from fully off the top, opaque (no fade) — the whole stack slides down
-  // into place as one unit, so it reads as arriving from off-screen instead of
-  // fading in. With STAGGER at 0 the uniform offset keeps the lines' spacing
-  // constant, so it's a clean block slide with no line-crossing. The travel must
-  // carry the *bottom* line above the viewport top: there's no fade here to hide
-  // a partial clear (unlike exit), so it runs larger than the exit and is sized
-  // for tall viewports. Same downward-from-the-top direction as the exit
-  // reversed, so on retake the header returns from where it left.
-  hidden: { y: -760, opacity: 1 },
-  // Enter on the shared GLIDE so, on the reverse flows (result/retake → start),
-  // the header settles in step with the blob gliding back down — not racing
-  // ahead of it (which read as "appears much earlier" than the blob).
-  show: {
-    y: 0,
-    opacity: 1,
-    transition: GLIDE,
-  },
-  // Slide the line clear of the viewport top on the same GLIDE the blob rides
-  // up — they travel together. popLayout pops the header out of flow so the blob
-  // glides up into the gap. The travel is large enough to fully leave the screen,
-  // and opacity holds through the slide and only fades at the tail, so it reads
-  // as sliding off, not dissolving.
-  exit: {
-    y: -520,
-    opacity: 0,
-    transition: { ...GLIDE, opacity: slow({ delay: 0.3, duration: 0.18 }) },
-  },
-};
-
 // forwardRef is required for AnimatePresence mode="popLayout": Motion pops the
 // exiting header out of flow by measuring it through this ref. Without it Motion
 // can't pop the header, so it keeps its layout space until it unmounts — and the
 // content jumps to fill the gap instead of filling smoothly during the peel.
-export const StartScreen = forwardRef<HTMLElement>(function StartScreen(_props, ref) {
+interface StartScreenProps {
+  /** Viewport-relative off-screen slide distance, shared with the blob/hint/cards. */
+  travel: number;
+}
+
+export const StartScreen = forwardRef<HTMLElement, StartScreenProps>(function StartScreen(
+  { travel },
+  ref,
+) {
+  // The whole stack slides down from off the top on enter and back up off the top
+  // on exit, opaque (no fade) so it reads as a block sliding on/off screen rather
+  // than dissolving — the tail opacity on exit is only a safety net for short
+  // viewports. Both legs travel a full viewport (see useOffscreenTravel), so the
+  // bottom line always clears the top edge regardless of display height. On the
+  // shared GLIDE, so header and blob travel together on the start↔quiz peel and
+  // the reverse retake return.
+  const line: Variants = {
+    hidden: { y: -travel, opacity: 1 },
+    show: { y: 0, opacity: 1, transition: GLIDE },
+    exit: {
+      y: -travel,
+      opacity: 0,
+      transition: { ...GLIDE, opacity: slow({ delay: 0.3, duration: 0.18 }) },
+    },
+  };
+
   return (
     <motion.header
       ref={ref}

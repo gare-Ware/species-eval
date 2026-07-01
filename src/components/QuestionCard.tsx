@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
 import type { Option, Question } from '@/data/questions';
@@ -12,30 +11,16 @@ interface QuestionCardProps {
   index: number; // 0-based
   total: number;
   onAnswer: (option: Option) => void;
+  /**
+   * Viewport-relative off-screen slide distance (see useOffscreenTravel), shared
+   * with the header/hint/blob so every element clears the edge on any display. The
+   * card rests near the middle of the column, so it needs the most travel to reach
+   * the bottom fold — a fixed offset made tall screens see it pop in mid-air.
+   */
+  travel: number;
 }
 
-// Every card enters from one full viewport below its resting spot and exits the
-// same way, so it always travels from / to *fully* off-screen — a fixed offset
-// can't, since the card rests near the middle of the column and the distance to
-// the bottom edge grows with viewport height (a too-small offset made tall
-// screens see the card pop into view at the bottom, then glide up). One viewport
-// is a safe over-reach: wherever the card rests, +100vh clears the fold. main's
-// overflow-clip hides the off-screen leg.
-function useOffscreenTravel() {
-  const [travel, setTravel] = useState(() =>
-    typeof window === 'undefined' ? 900 : window.innerHeight,
-  );
-  useEffect(() => {
-    const onResize = () => setTravel(window.innerHeight);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  return travel;
-}
-
-export function QuestionCard({ question, index, total, onAnswer }: QuestionCardProps) {
-  const travel = useOffscreenTravel();
-
+export function QuestionCard({ question, index, total, onAnswer, travel }: QuestionCardProps) {
   // OUTER shell: the only element that occupies column height, and the only thing
   // that drives the persistent blob's vertical glide. Its height ramps 0→auto on
   // enter and back to 0 on exit; since the column is vertically centered, that
