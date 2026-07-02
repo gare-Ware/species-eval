@@ -7,20 +7,22 @@ import type { Option } from '@/data/questions';
 import { questions } from '@/data/questions';
 import { getSpecies } from '@/data/species';
 import { scoreQuiz } from '@/lib/scoring';
-import { slow, SLOWMO } from '@/lib/slowmo';
-import { GLIDE } from '@/lib/motion';
-import { useOffscreenTravel } from '@/lib/useOffscreenTravel';
-
-// The "thinking beat": once the answered card has slid away and the blob has
-// enlarged + recentered, hold the empty centered blob this long before winding
-// up the next question. Scaled by SLOWMO so the dev toggle stretches it too.
-const THINK_DWELL_MS = 350;
+import { SLOWMO } from '@/lib/slowmo';
+import { fadeSlide } from '@/lib/motion';
 import { Starscape } from './Starscape';
 import { Blob } from './Blob';
 import type { Step } from './Blob';
 import { StartScreen } from './StartScreen';
 import { QuestionCard } from './QuestionCard';
 import { ResultCard } from './ResultCard';
+
+// The "thinking beat": once the answered card has left and the blob has enlarged +
+// recentered, hold the empty centered blob this long before winding up the next
+// question. Scaled by SLOWMO so the dev slow-mo toggle stretches it too.
+const THINK_DWELL_MS = 350;
+
+// The bottom hint rides the same restrained rise/sink as the question cards.
+const hint = fadeSlide('below');
 
 // Single client orchestrator: holds the flow state and choreographs one
 // continuous scene. The blob never unmounts — headline and step content animate
@@ -36,11 +38,6 @@ export function Quiz() {
   // Holds the pending wind-up while the blob "thinks". Cleared on unmount.
   const thinkTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(thinkTimer.current), []);
-
-  // Viewport-relative slide distance shared by every on/off-screen element (the
-  // header, the hint below, and the question cards) so none of them stop short of
-  // the edge on a larger display. Single source → they all travel in lockstep.
-  const travel = useOffscreenTravel();
 
   const winner = step === 'result' ? getSpecies(scoreQuiz(answers).winnerId) : null;
 
@@ -70,6 +67,10 @@ export function Quiz() {
   // leaves the content presence (exits downward) and the blob enlarges in place.
   // advance() then winds up the next question — see the content onExitComplete.
   function handleAnswer(option: Option) {
+    // The answered card stays in the DOM (popped out of flow) for its short exit
+    // fade and its buttons are still clickable — ignore late clicks so a fast
+    // double-tap can't record two answers.
+    if (step !== 'quiz') return;
     setAnswers([...answers, option]);
     setStep('thinking');
   }
@@ -94,23 +95,22 @@ export function Quiz() {
             blob starts its layout glide upward while the lines are still
             peeling away — one motion instead of two queued ones. */}
         <AnimatePresence mode="popLayout">
-          {step === 'start' && landingReady && <StartScreen key="headline" travel={travel} />}
+          {step === 'start' && landingReady && <StartScreen key="headline" />}
         </AnimatePresence>
 
         <Blob step={step} species={winner} onBegin={() => reset('quiz')} />
 
         {/* The hint gets its own popLayout island so its motion is independent of
-            the content swap below. It's opaque and starts/ends fully off the
-            bottom (mirroring the header off the top), so it reads as sliding in
-            from off-screen and back out — no fade — and comes back from where it
-            left. Tail-fade on exit is only a safety net for short viewports. */}
+            the content swap below. It rises in from just below the header and sinks
+            back out — the shared restrained rise/sink (see fadeSlide). */}
         <AnimatePresence mode="popLayout">
           {step === 'start' && landingReady && (
             <motion.p
               key="hint"
-              initial={{ y: travel, opacity: 1 }}
-              animate={{ y: 0, opacity: 1, transition: GLIDE }}
-              exit={{ y: travel, opacity: 0, transition: { ...GLIDE, opacity: slow({ delay: 0.3, duration: 0.18 }) } }}
+              variants={hint}
+              initial="hidden"
+              animate="show"
+              exit="exit"
               className="font-mono text-xs uppercase tracking-[0.3em] text-foreground/40"
             >
               Tap to begin · {questions.length} questions
@@ -118,12 +118,17 @@ export function Quiz() {
           )}
         </AnimatePresence>
 
-        {/* One content island. The answered card stays in flow while it leaves —
-            its shell height collapses to 0 (QuestionCard), re-centering the
-            column so the blob glides down as the card slides off-screen. The
-            result re-uses this island for the committed retake handoff. */}
+        {/* One content island, popLayout like the header/hint islands above: the
+            exiting card is popped out of flow the moment its exit starts — in the
+            same commit as the step change — so the column re-centers immediately
+            and the blob (layout-projected) glides down *while* the card fades.
+            mode="wait" kept the card's box until unmount, which happened outside
+            any render the blob could measure: the box vanished between frames and
+            the blob jumped. The step machine (quiz → thinking → quiz) guarantees
+            the island is empty while a card exits, so nothing overlaps. The result
+            re-uses this island for the committed retake handoff. */}
         <AnimatePresence
-          mode="wait"
+          mode="popLayout"
           onExitComplete={() => {
             // Thinking beat: the answered card has gone — hold the enlarged blob a
             // moment, then wind up the next question/result.
@@ -142,7 +147,6 @@ export function Quiz() {
               index={index}
               total={questions.length}
               onAnswer={handleAnswer}
-              travel={travel}
             />
           )}
           {step === 'result' && winner && (

@@ -2,8 +2,7 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import type { Species } from '@/data/species';
-import { slow } from '@/lib/slowmo';
-import { GLIDE } from '@/lib/motion';
+import { GLIDE, POP, PRESS_HERO } from '@/lib/motion';
 import { SpeciesGlyph } from './SpeciesGlyph';
 
 export type Step = 'start' | 'quiz' | 'thinking' | 'result';
@@ -40,16 +39,16 @@ export function Blob({ step, species, onBegin }: BlobProps) {
       disabled={!interactive}
       onClick={interactive ? onBegin : undefined}
       animate={{ width: SIZE[step], height: SIZE[step] }}
-      // Size: lower damping on the result reveal gives the size jump a springy
-      // overshoot — that bounce *is* the "blob pulses" beat of the reveal.
-      // Position: the `layout` glide is pinned to the shared GLIDE so the blob
-      // and the start-chrome (headline, hint) travel on the same spring.
+      // Size: the result reveal rides POP (a springy overshoot) — that bounce *is*
+      // the "blob pulses" beat; every other size change rides the calm GLIDE.
+      // Position: the `layout` glide is pinned to the shared GLIDE so the blob and
+      // the start-chrome (headline, hint) travel on the same spring.
       transition={{
-        ...slow({ type: 'spring', stiffness: 320, damping: step === 'result' ? 16 : 26 }),
+        ...(step === 'result' ? POP : GLIDE),
         layout: GLIDE,
       }}
-      whileHover={interactive ? { scale: 1.06 } : undefined}
-      whileTap={interactive ? { scale: 0.93 } : undefined}
+      whileHover={interactive ? PRESS_HERO.whileHover : undefined}
+      whileTap={interactive ? PRESS_HERO.whileTap : undefined}
       className="relative shrink-0 rounded-full bg-accent transition-colors duration-700 [container-type:size] enabled:cursor-pointer"
     >
       {/* Breathing lives on an inner layer so the infinite loop never fights the
@@ -65,7 +64,9 @@ export function Blob({ step, species, onBegin }: BlobProps) {
               key={species.id}
               initial={{ scale: 0.4, opacity: 0, rotate: -10 }}
               animate={{ scale: 1, opacity: 1, rotate: 0 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 22, delay: 0.25 }}
+              // The glyph pops in just after the blob has sprung to full size — same
+              // POP overshoot, held back by delay so it lands as its own beat.
+              transition={{ ...POP, delay: 0.25 }}
               className="grid h-[58cqw] w-[58cqw] place-items-center text-background"
             >
               <SpeciesGlyph id={species.id} className="h-full w-full" />
