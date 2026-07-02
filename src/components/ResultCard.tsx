@@ -1,9 +1,10 @@
 'use client';
 
+import { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
 import type { Species } from '@/data/species';
-import { slow } from '@/lib/slowmo';
+import { EXIT, PRESS, SETTLE, stagger } from '@/lib/motion';
 
 interface ResultCardProps {
   species: Species;
@@ -23,31 +24,29 @@ interface ResultCardProps {
 // Theme takeover (species color via --foreground/--accent) is owned by Quiz.
 const container: Variants = {
   hidden: {},
-  show: { transition: { delayChildren: 0.55, staggerChildren: 0.11 } },
-  // Retake: glide the whole card down and off, then fade. The landing chrome is
-  // held back until this finishes (see Quiz), so the result clearly leaves before
-  // the start screen arrives — instead of fading in place or jumping.
-  exit: {
-    opacity: 0,
-    y: 220,
-    transition: slow({ duration: 0.35, ease: 'easeIn', opacity: { duration: 0.28 } }),
-  },
+  show: { transition: stagger(0.55, 0.11) },
+  // Retake: the card drifts down and fades in place — popped out of flow by the
+  // content island — while the landing chrome enters around it and the blob makes
+  // its single glide back to the start layout (see Quiz's content island).
+  exit: { opacity: 0, y: 24, transition: EXIT },
 };
 
 const item: Variants = {
   hidden: { opacity: 0, y: 18 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { type: 'spring', stiffness: 420, damping: 36 },
-  },
+  show: { opacity: 1, y: 0, transition: SETTLE },
 };
 
-export function ResultCard({ species, narrative, onRetake }: ResultCardProps) {
+// forwardRef: required by the content island's AnimatePresence mode="popLayout"
+// (it measures + pins the exiting card through this ref — see StartScreen).
+export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function ResultCard(
+  { species, narrative, onRetake },
+  ref,
+) {
   const body = narrative ?? species.description;
 
   return (
     <motion.section
+      ref={ref}
       className="flex w-full flex-col items-center gap-6 text-center"
       variants={container}
       initial="hidden"
@@ -92,8 +91,7 @@ export function ResultCard({ species, narrative, onRetake }: ResultCardProps) {
         <motion.button
           type="button"
           onClick={onRetake}
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.96 }}
+          {...PRESS}
           className="mt-2 rounded-full border border-foreground/25 px-6 py-2.5 font-medium transition-colors hover:border-foreground/60"
         >
           Take it again
@@ -101,4 +99,4 @@ export function ResultCard({ species, narrative, onRetake }: ResultCardProps) {
       </motion.div>
     </motion.section>
   );
-}
+});

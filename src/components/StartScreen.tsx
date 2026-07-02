@@ -3,8 +3,7 @@
 import { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
-import { slow } from '@/lib/slowmo';
-import { GLIDE } from '@/lib/motion';
+import { fadeSlide, stagger } from '@/lib/motion';
 
 // Poster-stacked headline. Each line is its own tiny SVG: `textLength` forces
 // every line to fill the exact same measure (true magazine justification, which
@@ -17,48 +16,28 @@ const LINES = [
   { text: 'Are You', fontSize: 228, height: 172, baseline: 166 },
 ];
 
-// Per-line peel stagger. 0 = the lines glide in and out in unison (the staggered
+// Per-line peel stagger. 0 = the lines settle in and out in unison (the staggered
 // version read as too lopsided — the bottom lines moved well before the top one
 // did). Bump this (e.g. 0.05) to bring the line-by-line peel back; exit keeps
 // staggerDirection -1 so that peel runs bottom-up and clears the blob first.
 const STAGGER = 0;
 
+// The whole stack settles down from just above on enter and drifts back up on
+// exit — a short offset + fade (see fadeSlide), not a full-screen slide. On the
+// shared GLIDE, so header and blob travel together on the start↔quiz peel.
+const line: Variants = fadeSlide('above');
+
 const container: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: STAGGER, delayChildren: 0.05 } },
-  exit: { transition: slow({ staggerChildren: STAGGER, staggerDirection: -1 }) },
+  exit: { transition: stagger(0, STAGGER, -1) },
 };
 
 // forwardRef is required for AnimatePresence mode="popLayout": Motion pops the
 // exiting header out of flow by measuring it through this ref. Without it Motion
 // can't pop the header, so it keeps its layout space until it unmounts — and the
 // content jumps to fill the gap instead of filling smoothly during the peel.
-interface StartScreenProps {
-  /** Viewport-relative off-screen slide distance, shared with the blob/hint/cards. */
-  travel: number;
-}
-
-export const StartScreen = forwardRef<HTMLElement, StartScreenProps>(function StartScreen(
-  { travel },
-  ref,
-) {
-  // The whole stack slides down from off the top on enter and back up off the top
-  // on exit, opaque (no fade) so it reads as a block sliding on/off screen rather
-  // than dissolving — the tail opacity on exit is only a safety net for short
-  // viewports. Both legs travel a full viewport (see useOffscreenTravel), so the
-  // bottom line always clears the top edge regardless of display height. On the
-  // shared GLIDE, so header and blob travel together on the start↔quiz peel and
-  // the reverse retake return.
-  const line: Variants = {
-    hidden: { y: -travel, opacity: 1 },
-    show: { y: 0, opacity: 1, transition: GLIDE },
-    exit: {
-      y: -travel,
-      opacity: 0,
-      transition: { ...GLIDE, opacity: slow({ delay: 0.3, duration: 0.18 }) },
-    },
-  };
-
+export const StartScreen = forwardRef<HTMLElement>(function StartScreen(_props, ref) {
   return (
     <motion.header
       ref={ref}
@@ -68,6 +47,10 @@ export const StartScreen = forwardRef<HTMLElement, StartScreenProps>(function St
       animate="show"
       exit="exit"
     >
+      {/* The poster headline is drawn as SVG text (below) with no accessible name,
+          so this carries the real heading for screen readers and search engines. */}
+      <h1 className="sr-only">What species are you?</h1>
+
       <motion.p
         variants={line}
         className="mb-2 text-center font-mono text-xs uppercase tracking-[0.35em] text-foreground/40"
