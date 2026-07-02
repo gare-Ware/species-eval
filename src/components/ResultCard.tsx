@@ -25,9 +25,9 @@ interface ResultCardProps {
 const container: Variants = {
   hidden: {},
   show: { transition: stagger(0.55, 0.11) },
-  // Retake: the whole card drifts down and fades. The landing chrome is held back
-  // until this finishes (see Quiz), so the result clearly leaves before the start
-  // screen arrives — instead of fading in place or jumping.
+  // Retake: the card drifts down and fades in place — popped out of flow by the
+  // content island — while the landing chrome enters around it and the blob makes
+  // its single glide back to the start layout (see Quiz's content island).
   exit: { opacity: 0, y: 24, transition: EXIT },
 };
 

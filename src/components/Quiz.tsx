@@ -31,10 +31,6 @@ export function Quiz() {
   const [step, setStep] = useState<Step>('start');
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Option[]>([]);
-  // Gates the landing chrome (headline + hint) on retake: held false while the
-  // result glides off, then released once it's gone (see reset + onExitComplete),
-  // so the result leaves before the start screen arrives instead of being shoved.
-  const [landingReady, setLandingReady] = useState(true);
   // Holds the pending wind-up while the blob "thinks". Cleared on unmount.
   const thinkTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(thinkTimer.current), []);
@@ -56,11 +52,6 @@ export function Quiz() {
     setStep(nextStep);
     setIndex(0);
     setAnswers([]);
-    // On retake (→ start), hold the landing chrome back until the result has
-    // glided off — released in the content AnimatePresence's onExitComplete — so
-    // the species card clearly leaves first, instead of being shoved down by the
-    // headline and hint as they enter.
-    if (nextStep === 'start') setLandingReady(false);
   }
 
   // Route every answer through the centered 'thinking' beat: the answered card
@@ -95,7 +86,7 @@ export function Quiz() {
             blob starts its layout glide upward while the lines are still
             peeling away — one motion instead of two queued ones. */}
         <AnimatePresence mode="popLayout">
-          {step === 'start' && landingReady && <StartScreen key="headline" />}
+          {step === 'start' && <StartScreen key="headline" />}
         </AnimatePresence>
 
         <Blob step={step} species={winner} onBegin={() => reset('quiz')} />
@@ -104,7 +95,7 @@ export function Quiz() {
             the content swap below. It rises in from just below the header and sinks
             back out — the shared restrained rise/sink (see fadeSlide). */}
         <AnimatePresence mode="popLayout">
-          {step === 'start' && landingReady && (
+          {step === 'start' && (
             <motion.p
               key="hint"
               variants={hint}
@@ -125,8 +116,12 @@ export function Quiz() {
             mode="wait" kept the card's box until unmount, which happened outside
             any render the blob could measure: the box vanished between frames and
             the blob jumped. The step machine (quiz → thinking → quiz) guarantees
-            the island is empty while a card exits, so nothing overlaps. The result
-            re-uses this island for the committed retake handoff. */}
+            the island is empty while a card exits, so nothing overlaps. Retake
+            needs no gate for the same reason: the exiting result has no box, so
+            the landing chrome mounts in the same commit without shoving anything —
+            the result fades in place while the headline/hint settle in, and the
+            blob makes ONE glide from its result spot to its start spot (gating the
+            chrome behind onExitComplete parked the blob alone at center first). */}
         <AnimatePresence
           mode="popLayout"
           onExitComplete={() => {
@@ -134,9 +129,6 @@ export function Quiz() {
             // moment, then wind up the next question/result.
             if (step === 'thinking') {
               thinkTimer.current = setTimeout(advance, THINK_DWELL_MS * SLOWMO);
-            } else if (step === 'start') {
-              // Retake: result has glided off — release the landing chrome.
-              setLandingReady(true);
             }
           }}
         >
