@@ -19,15 +19,16 @@ narrative route.
 ## Stack
 
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind v4 · [Motion](https://motion.dev)
-· Vitest
+· Vitest · Playwright
 
 ## Getting started
 
-Use Node 20+ and npm 10+ (`.nvmrc` pins Node 20 for nvm users).
+Use Node 20+ and npm 9+ (`.nvmrc` pins Node 20 for nvm users).
 
 ```bash
 nvm use
 npm install
+npx playwright install chromium   # first time only, for npm run test:e2e
 npm run dev   # → http://localhost:3000
 ```
 
@@ -41,6 +42,7 @@ npm run dev   # → http://localhost:3000
 | `npm run lint`      | ESLint                                                          |
 | `npm run typecheck` | `tsc --noEmit` — verifies the `SpeciesId` scoring contracts     |
 | `npm run test`      | Vitest: scoring core, flow step machine, data invariants        |
+| `npm run test:e2e`  | Playwright: browser smoke tests for quiz flow and layout        |
 
 ## Project structure
 
@@ -50,6 +52,7 @@ src/
   data/         species.ts, questions.ts — typed quiz content (+ integrity tests)
   lib/          flow (step machine) · scoring · motion (animation vocabulary) · slowmo (dev toggle)
   components/   Quiz orchestrator · StartScreen / QuestionCard / ResultCard · Blob / Starscape / SpeciesGlyph
+tests/e2e/      Playwright smoke tests for behavior contracts, not visual snapshots
 ```
 
 Quiz content is plain typed TypeScript — a `SpeciesId` union types every option's `scores`

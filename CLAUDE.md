@@ -9,11 +9,14 @@ multiple-choice quiz and gets matched to one of a handful of alien species, with
 AI-generated personalized result. Human-facing overview and setup live in `README.md`.
 
 ## Commands
-- Use Node 20+ and npm 10+ (`.nvmrc` pins Node 20; npm scripts preflight this).
+- Use Node 20+ and npm 9+ (`.nvmrc` pins Node 20; npm scripts preflight Node).
 - `npm run dev` — dev server (http://localhost:3000)
 - `npm run build` — production build (also type-checks) · `npm run start` — serve it
 - `npm run lint` — ESLint · `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — Vitest (scoring core, flow step machine, data invariants — no UI tests yet)
+- `npm run test` — Vitest (scoring core, flow step machine, data invariants)
+- `npm run test:e2e` — Playwright browser smoke tests (flow, focus, reduced motion,
+  mobile overflow; no visual snapshot assertions)
+- If Playwright browsers are missing locally, run `npx playwright install chromium`.
 
 ## Stack
 - Next.js 15 (App Router) · React 19 · TypeScript
