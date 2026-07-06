@@ -24,9 +24,9 @@
 .DS_Store
 *.pem
 
-# local-only notes
+# local-only notes (AGENTS.md is a local symlink to CLAUDE.md, for Codex)
 CLAUDE.local.md
-AGENTS.local.md
+AGENTS.md
 
 # debug
 npm-debug.log*
