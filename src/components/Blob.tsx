@@ -44,7 +44,7 @@ export function Blob({ step, species, onBegin }: BlobProps) {
       }}
       whileHover={interactive && !prefersReducedMotion ? PRESS_HERO.whileHover : undefined}
       whileTap={interactive && !prefersReducedMotion ? PRESS_HERO.whileTap : undefined}
-      className="relative shrink-0 rounded-full bg-accent transition-colors duration-(--theme-fade) [container-type:size] enabled:cursor-pointer"
+      className="relative shrink-0 rounded-full bg-accent transition-colors duration-(--theme-fade) @container-size enabled:cursor-pointer"
     >
       {/* Inner layer: the breathing loop stays off the step-driven button springs. */}
       <motion.span

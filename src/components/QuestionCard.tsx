@@ -113,7 +113,7 @@ export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function 
                 className={`w-full rounded-xl border px-5 py-4 text-left transition-colors disabled:cursor-default ${
                   isPicked
                     ? 'border-foreground bg-foreground text-background'
-                    : 'border-foreground/10 bg-foreground/[0.04] hover:border-foreground/35 hover:bg-foreground/[0.08]'
+                    : 'border-foreground/10 bg-foreground/4 hover:border-foreground/35 hover:bg-foreground/8'
                 }`}
               >
                 {option.label}
