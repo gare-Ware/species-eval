@@ -6,9 +6,9 @@ import { scoreQuiz } from './scoring';
 describe('scoreQuiz', () => {
   it('picks the species with the highest tally', () => {
     const answers: Option[] = [
-      { label: 'a', scores: { reptilians: 2 } },
-      { label: 'b', scores: { reptilians: 2, grays: 1 } },
-      { label: 'c', scores: { grays: 1 } },
+      { id: 'a', label: 'a', scores: { reptilians: 2 } },
+      { id: 'b', label: 'b', scores: { reptilians: 2, grays: 1 } },
+      { id: 'c', label: 'c', scores: { grays: 1 } },
     ];
 
     const { winnerId, profile } = scoreQuiz(answers);
@@ -21,8 +21,8 @@ describe('scoreQuiz', () => {
   it('breaks ties by ACTIVE_SPECIES_IDS order', () => {
     // grays and nordics both reach 2; grays comes first in the active roster.
     const answers: Option[] = [
-      { label: 'a', scores: { nordics: 2 } },
-      { label: 'b', scores: { grays: 2 } },
+      { id: 'a', label: 'a', scores: { nordics: 2 } },
+      { id: 'b', label: 'b', scores: { grays: 2 } },
     ];
 
     expect(scoreQuiz(answers).winnerId).toBe('grays');
@@ -34,8 +34,8 @@ describe('scoreQuiz', () => {
   it('ignores points awarded to inactive species', () => {
     const answers: Option[] = [
       // 'pleiadians' is authored but not in the active roster; it must never win.
-      { label: 'a', scores: { pleiadians: 99 } },
-      { label: 'b', scores: { mantids: 1 } },
+      { id: 'a', label: 'a', scores: { pleiadians: 99 } },
+      { id: 'b', label: 'b', scores: { mantids: 1 } },
     ];
 
     const { winnerId, profile } = scoreQuiz(answers);

@@ -1,9 +1,14 @@
 'use client';
 
 import { forwardRef } from 'react';
-import { motion } from 'motion/react';
+import type { Ref } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import type { Variants } from 'motion/react';
-import { fadeSlide, stagger } from '@/lib/motion';
+import { FADE, fadeSlide, stagger } from '@/lib/motion';
+
+interface StartScreenProps {
+  headingRef?: Ref<HTMLHeadingElement>;
+}
 
 // Poster-stacked headline. Each line is its own SVG: textLength justifies every
 // line to the same measure (true magazine justification, which CSS can't do);
@@ -30,30 +35,45 @@ const container: Variants = {
   exit: { transition: stagger(0, STAGGER, -1) },
 };
 
+const quietContainer: Variants = {
+  hidden: {},
+  show: {},
+  exit: {},
+};
+
 // forwardRef: AnimatePresence mode="popLayout" measures and pins the exiting
 // element through this ref; without it the header keeps its layout space until
 // unmount and the content below jumps instead of filling smoothly.
-export const StartScreen = forwardRef<HTMLElement>(function StartScreen(_props, ref) {
+export const StartScreen = forwardRef<HTMLElement, StartScreenProps>(function StartScreen(
+  { headingRef },
+  ref,
+) {
+  const prefersReducedMotion = useReducedMotion();
+  const lineVariants = prefersReducedMotion ? FADE : line;
+  const containerVariants = prefersReducedMotion ? quietContainer : container;
+
   return (
     <motion.header
       ref={ref}
       className="flex w-full flex-col gap-2"
-      variants={container}
+      variants={containerVariants}
       initial="hidden"
       animate="show"
       exit="exit"
     >
       {/* The SVG headline has no accessible name; this carries the real heading. */}
-      <h1 className="sr-only">What species are you?</h1>
+      <h1 ref={headingRef} tabIndex={-1} className="sr-only">
+        What species are you?
+      </h1>
 
       <motion.p
-        variants={line}
+        variants={lineVariants}
         className="mb-2 text-center font-mono text-xs uppercase tracking-[0.35em] text-foreground/40"
       >
         An alien species evaluation
       </motion.p>
       {LINES.map(({ text, fontSize, height, baseline }) => (
-        <motion.div key={text} variants={line}>
+        <motion.div key={text} variants={lineVariants}>
           <svg
             viewBox={`0 0 1000 ${height}`}
             className="block w-full"

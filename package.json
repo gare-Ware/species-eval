@@ -2,12 +2,22 @@
   "name": "species-eval",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
+    "predev": "node scripts/require-node.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/require-node.mjs",
     "build": "next build",
+    "prestart": "node scripts/require-node.mjs",
     "start": "next start",
+    "prelint": "node scripts/require-node.mjs",
     "lint": "eslint",
+    "pretypecheck": "node scripts/require-node.mjs",
     "typecheck": "tsc --noEmit",
+    "pretest": "node scripts/require-node.mjs",
     "test": "vitest run"
   },
   "dependencies": {

@@ -23,7 +23,10 @@ Next.js 15 (App Router) · React 19 · TypeScript · Tailwind v4 · [Motion](htt
 
 ## Getting started
 
+Use Node 20+ and npm 10+ (`.nvmrc` pins Node 20 for nvm users).
+
 ```bash
+nvm use
 npm install
 npm run dev   # → http://localhost:3000
 ```

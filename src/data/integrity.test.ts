@@ -22,6 +22,16 @@ describe('species data', () => {
 });
 
 describe('question data', () => {
+  it('has stable option ids unique within each question', () => {
+    for (const question of questions) {
+      const ids = question.options.map((option) => option.id);
+      expect(new Set(ids).size, question.id).toBe(ids.length);
+      for (const id of ids) {
+        expect(id, question.id).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+      }
+    }
+  });
+
   it('awards only positive weights', () => {
     for (const question of questions) {
       for (const option of question.options) {

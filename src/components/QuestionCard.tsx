@@ -1,13 +1,16 @@
 'use client';
 
 import { forwardRef, useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import type { Ref } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import type { Option, Question } from '@/data/questions';
 import {
   CONFIRM_HOLD_MS,
+  FADE,
   fadeSlide,
   PICKED,
   PRESS_ROW,
+  REDUCED_CONFIRM_HOLD_MS,
   SETTLE,
   SNAPPY,
   UNPICKED,
@@ -17,6 +20,7 @@ interface QuestionCardProps {
   question: Question;
   index: number; // 0-based
   total: number;
+  headingRef?: Ref<HTMLHeadingElement>;
   onAnswer: (option: Option) => void;
 }
 
@@ -26,27 +30,34 @@ const card = fadeSlide('below');
 
 // forwardRef: popLayout pins the exiting card through this ref (see StartScreen).
 export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function QuestionCard(
-  { question, index, total, onAnswer },
+  { question, index, total, headingRef, onAnswer },
   ref,
 ) {
   // Confirm beat: the chosen row inverts + pops and the rest dim immediately;
   // onAnswer is deferred by CONFIRM_HOLD_MS so the pick registers before the
   // exit begins. Local state — the card remounts per question (keyed in Quiz).
-  const [picked, setPicked] = useState<string | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+  const [picked, setPicked] = useState<Option['id'] | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(holdTimer.current), []);
 
   function pick(option: Option) {
     if (picked) return;
-    setPicked(option.label);
-    holdTimer.current = setTimeout(() => onAnswer(option), CONFIRM_HOLD_MS);
+    setPicked(option.id);
+    holdTimer.current = setTimeout(
+      () => onAnswer(option),
+      prefersReducedMotion ? REDUCED_CONFIRM_HOLD_MS : CONFIRM_HOLD_MS,
+    );
   }
+
+  const cardVariants = prefersReducedMotion ? FADE : card;
 
   return (
     <motion.section
       ref={ref}
+      aria-labelledby={`question-${question.id}-title`}
       className="flex w-full flex-col gap-6"
-      variants={card}
+      variants={cardVariants}
       initial="hidden"
       animate="show"
       exit="exit"
@@ -55,30 +66,47 @@ export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function 
         <span>
           Question {index + 1} of {total}
         </span>
-        <div className="h-1 w-24 overflow-hidden rounded-full bg-foreground/10">
+        <div
+          className="h-1 w-24 overflow-hidden rounded-full bg-foreground/10"
+          role="progressbar"
+          aria-label="Quiz progress"
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-valuenow={index + 1}
+        >
           <motion.div
-            className="h-full rounded-full bg-foreground/60"
-            initial={{ width: `${(index / total) * 100}%` }}
-            animate={{ width: `${((index + 1) / total) * 100}%` }}
+            className="h-full w-full origin-left rounded-full bg-foreground/60"
+            initial={{ scaleX: index / total }}
+            animate={{ scaleX: (index + 1) / total }}
             transition={SETTLE}
           />
         </div>
       </div>
 
-      <h2 className="text-2xl font-semibold sm:text-3xl">{question.prompt}</h2>
+      <h2
+        id={`question-${question.id}-title`}
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-2xl font-semibold focus:outline-none sm:text-3xl"
+      >
+        {question.prompt}
+      </h2>
 
       {/* pointer-events-none during the hold: the choice is made, so hover and
           further taps go quiet while the confirm plays. */}
       <ul className={`flex flex-col gap-3 ${picked ? 'pointer-events-none' : ''}`}>
         {question.options.map((option) => {
-          const isPicked = picked === option.label;
+          const isPicked = picked === option.id;
+          const pickedTarget = prefersReducedMotion ? undefined : PICKED;
+          const rowTarget = picked ? (isPicked ? pickedTarget : UNPICKED) : undefined;
+
           return (
-            <li key={option.label}>
+            <li key={option.id}>
               <motion.button
                 type="button"
                 onClick={() => pick(option)}
-                {...PRESS_ROW}
-                animate={picked ? (isPicked ? PICKED : UNPICKED) : undefined}
+                {...(prefersReducedMotion ? {} : PRESS_ROW)}
+                animate={rowTarget}
                 transition={SNAPPY}
                 className={`w-full rounded-xl border px-5 py-4 text-left transition-colors ${
                   isPicked

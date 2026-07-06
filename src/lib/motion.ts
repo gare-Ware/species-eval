@@ -32,6 +32,14 @@ export const POP: Transition = slow(POP_SPRING);
 const EXIT_SECONDS = 0.22;
 export const EXIT: Transition = slow({ duration: EXIT_SECONDS, ease: [0.3, 0, 1, 1] });
 
+// Reduced-motion path: opacity-only, short, and no spring/layout choreography.
+export const REDUCED_FADE: Transition = { duration: 0.12, ease: [0.2, 0, 0, 1] };
+export const FADE: Variants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: REDUCED_FADE },
+  exit: { opacity: 0, transition: REDUCED_FADE },
+};
+
 // ─── Interaction ─────────────────────────────────────────────────────────────
 // One hover/tap language for every pressable, by button shape:
 //   PRESS      — compact controls (the retake pill)
@@ -77,10 +85,12 @@ export function stagger(delayChildren: number, staggerChildren: number, staggerD
 // Confirm hold: how long the picked answer stays on screen before the card's
 // exit begins (QuestionCard defers onAnswer by this).
 export const CONFIRM_HOLD_MS = slowMs(500);
+export const REDUCED_CONFIRM_HOLD_MS = 150;
 
 // Thinking beat: hold on the empty centered blob between questions before the
 // next card winds up (a setTimeout in Quiz, hence ms).
 export const THINK_DWELL_MS = slowMs(350);
+export const REDUCED_THINK_DWELL_MS = 0;
 
 // Result reveal timeline: the blob pops to size (POP, in Blob) → the "?" clears
 // on EXIT and the glyph pops in ~0.4s after the step change (GLYPH_POP's delay

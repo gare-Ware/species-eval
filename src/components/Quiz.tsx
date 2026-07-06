@@ -2,12 +2,13 @@
 
 import { useEffect, useReducer, useRef } from 'react';
 import type { CSSProperties } from 'react';
-import { AnimatePresence, MotionConfig, motion } from 'motion/react';
+import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/react';
 import { questions } from '@/data/questions';
 import { getSpecies } from '@/data/species';
+import type { QuizEvent } from '@/lib/flow';
 import { INITIAL_FLOW, quizFlowReducer } from '@/lib/flow';
 import { scoreQuiz } from '@/lib/scoring';
-import { fadeSlide, THINK_DWELL_MS } from '@/lib/motion';
+import { FADE, fadeSlide, REDUCED_THINK_DWELL_MS, THINK_DWELL_MS } from '@/lib/motion';
 import { Starscape } from './Starscape';
 import { Blob } from './Blob';
 import { StartScreen } from './StartScreen';
@@ -22,13 +23,54 @@ const hint = fadeSlide('below');
 // animate around it while its `layout` prop glides it to each new spot. The
 // one side effect owned here is the thinking-beat timer.
 export function Quiz() {
+  const prefersReducedMotion = useReducedMotion();
   const [{ step, answers }, dispatch] = useReducer(quizFlowReducer, INITIAL_FLOW);
   const thinkTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const hasUserNavigated = useRef(false);
+  const startHeadingRef = useRef<HTMLHeadingElement>(null);
+  const questionHeadingRef = useRef<HTMLHeadingElement>(null);
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => () => clearTimeout(thinkTimer.current), []);
 
   // In 'quiz' the current question is always the one after the recorded answers.
   const index = Math.min(answers.length, questions.length - 1);
   const winner = step === 'result' ? getSpecies(scoreQuiz(answers).winnerId) : null;
+  const isFinalThinkingBeat = step === 'thinking' && answers.length >= questions.length;
+  let announcement = '';
+  if (step === 'quiz') {
+    announcement = `Question ${index + 1} of ${questions.length}`;
+  } else if (isFinalThinkingBeat) {
+    announcement = 'Preparing your result';
+  } else if (step === 'thinking') {
+    announcement = 'Preparing the next question';
+  } else if (winner) {
+    announcement = `Result: You are ${winner.name}`;
+  }
+  const hintVariants = prefersReducedMotion ? FADE : hint;
+
+  function send(event: QuizEvent) {
+    hasUserNavigated.current = true;
+    dispatch(event);
+  }
+
+  useEffect(() => {
+    if (!hasUserNavigated.current || step === 'thinking') return;
+
+    const target =
+      step === 'start'
+        ? startHeadingRef.current
+        : step === 'quiz'
+          ? questionHeadingRef.current
+          : resultHeadingRef.current;
+
+    if (!target) return;
+
+    const frame = requestAnimationFrame(() => {
+      target.focus({ preventScroll: true });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [index, step, winner?.id]);
 
   // Theme takeover for this subtree (Starscape included, so the sky tints too):
   // --accent gets the pure species color; --foreground blends toward the base so
@@ -43,15 +85,18 @@ export function Quiz() {
   return (
     <MotionConfig reducedMotion="user">
       <div style={theme} className="flex w-full flex-col items-center gap-10">
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </p>
         <Starscape />
 
         {/* popLayout pops the exiting headline from flow immediately, so the
             blob's layout glide starts while the lines are still peeling away. */}
         <AnimatePresence mode="popLayout">
-          {step === 'start' && <StartScreen key="headline" />}
+          {step === 'start' && <StartScreen key="headline" headingRef={startHeadingRef} />}
         </AnimatePresence>
 
-        <Blob step={step} species={winner} onBegin={() => dispatch({ type: 'begin' })} />
+        <Blob step={step} species={winner} onBegin={() => send({ type: 'begin' })} />
 
         {/* Separate island so the hint's motion is independent of the content
             swap below. */}
@@ -59,7 +104,7 @@ export function Quiz() {
           {step === 'start' && (
             <motion.p
               key="hint"
-              variants={hint}
+              variants={hintVariants}
               initial="hidden"
               animate="show"
               exit="exit"
@@ -83,7 +128,11 @@ export function Quiz() {
           onExitComplete={() => {
             // Thinking beat: the answered card is gone — dwell, then wind up.
             if (step === 'thinking') {
-              thinkTimer.current = setTimeout(() => dispatch({ type: 'advance' }), THINK_DWELL_MS);
+              clearTimeout(thinkTimer.current);
+              thinkTimer.current = setTimeout(
+                () => dispatch({ type: 'advance' }),
+                prefersReducedMotion ? REDUCED_THINK_DWELL_MS : THINK_DWELL_MS,
+              );
             }
           }}
         >
@@ -93,14 +142,16 @@ export function Quiz() {
               question={questions[index]}
               index={index}
               total={questions.length}
-              onAnswer={(option) => dispatch({ type: 'answer', option })}
+              headingRef={questionHeadingRef}
+              onAnswer={(option) => send({ type: 'answer', option })}
             />
           )}
           {step === 'result' && winner && (
             <ResultCard
               key="result"
               species={winner}
-              onRetake={() => dispatch({ type: 'retake' })}
+              headingRef={resultHeadingRef}
+              onRetake={() => send({ type: 'retake' })}
             />
           )}
         </AnimatePresence>

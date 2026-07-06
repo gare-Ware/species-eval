@@ -20,7 +20,7 @@ export interface Species {
   id: SpeciesId;
   name: string;
   tagline: string;
-  description: string; // prose; may contain markdown
+  description: string; // prose; may contain limited inline markdown (`*emphasis*`)
   traits: string[];
   accent: string; // CSS color for per-species theming
 }
@@ -145,7 +145,9 @@ export const ACTIVE_SPECIES_IDS = [
   'reptilians',
   'mantids',
   'hybrids',
-] satisfies SpeciesId[];
+] as const satisfies readonly SpeciesId[];
+
+export type ActiveSpeciesId = (typeof ACTIVE_SPECIES_IDS)[number];
 
 const activeIdSet = new Set<SpeciesId>(ACTIVE_SPECIES_IDS);
 
@@ -158,6 +160,6 @@ export function getSpecies(id: SpeciesId): Species {
   return found;
 }
 
-export function isActiveSpecies(id: SpeciesId): boolean {
+export function isActiveSpecies(id: SpeciesId): id is ActiveSpeciesId {
   return activeIdSet.has(id);
 }
