@@ -1,17 +1,15 @@
 // flow.ts
-// The quiz's step machine, extracted from the Quiz component so every transition
-// is pure, guarded, and unit-testable. Components dispatch events; choreography
-// side effects (the thinking-beat timer) stay in Quiz where they belong.
+// The quiz's step machine: pure, guarded transitions, unit-tested. Components
+// dispatch events; timing side effects (the choreography beats) stay in Quiz.
 //
 //   start → (begin) → quiz ⇄ thinking → result → (retake) → start
 //
-// 'thinking' is the between-question beat: the answered card has left, the blob
-// enlarges + recenters, and nothing occupies the content island.
+// 'thinking' is the between-question beat: the content island is empty while
+// the blob enlarges and recenters.
 //
-// Phase-3 seam: the AI-narrative call lands here. 'thinking' becomes the async
-// state — fire the fetch on the last 'answer', and dispatch 'advance' from
-// Promise.all([minDwell, fetch]) so the reveal choreography absorbs the latency
-// instead of a spinner.
+// Phase-3 seam: the AI narrative call lands here — fire the fetch on the last
+// 'answer', dispatch 'advance' from Promise.all([minDwell, fetch]) so the
+// reveal choreography absorbs the latency.
 
 import type { Option } from '@/data/questions';
 import { questions } from '@/data/questions';
@@ -22,8 +20,7 @@ export interface QuizFlow {
   step: Step;
   /**
    * Chosen options so far. The current question index is derived: while in
-   * 'quiz' it is always answers.length (the machine only re-enters 'quiz' when
-   * a question remains), so index needs no state of its own.
+   * 'quiz' it is always answers.length.
    */
   answers: Option[];
 }
@@ -41,10 +38,8 @@ export function quizFlowReducer(state: QuizFlow, event: QuizEvent): QuizFlow {
     case 'begin':
       return { step: 'quiz', answers: [] };
     case 'answer':
-      // Guard: only from 'quiz'. The answered card stays in the DOM (popped out
-      // of flow) for its short exit fade and its buttons remain clickable, so a
-      // fast double-tap fires a second 'answer' from 'thinking' — ignore it
-      // instead of recording two answers.
+      // Guard: the exiting card's buttons stay clickable during its fade, so a
+      // fast double-tap fires a second 'answer' from 'thinking' — ignore it.
       if (state.step !== 'quiz') return state;
       return { step: 'thinking', answers: [...state.answers, event.option] };
     case 'advance':

@@ -1,6 +1,6 @@
 // species.ts
-// Canonical source for the alien species used in the quiz.
-// Per CLAUDE.md: typed data file (not JSON); `satisfies` preserves literal id inference.
+// Canonical source for the alien species — typed data, with `satisfies`
+// preserving literal id inference.
 
 export type SpeciesId =
   | 'grays'
@@ -149,8 +149,7 @@ export const ACTIVE_SPECIES_IDS = [
 
 const activeIdSet = new Set<SpeciesId>(ACTIVE_SPECIES_IDS);
 
-// getSpecies (not a bare find + `!`) so a roster id without an authored entry
-// fails loudly at module load instead of smuggling `undefined` downstream.
+// Via getSpecies so an unauthored roster id fails loudly at module load.
 export const activeSpecies: Species[] = ACTIVE_SPECIES_IDS.map((id) => getSpecies(id));
 
 export function getSpecies(id: SpeciesId): Species {

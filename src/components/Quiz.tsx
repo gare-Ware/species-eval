@@ -18,25 +18,21 @@ import { ResultCard } from './ResultCard';
 const hint = fadeSlide('below');
 
 // Single client orchestrator: renders one continuous scene around the step
-// machine (lib/flow.ts — all transitions and guards live there). The blob never
-// unmounts — headline and step content animate around it (AnimatePresence), and
-// its `layout` prop glides it to each new spot. The one side effect owned here
-// is choreography: the thinking-beat timer that dispatches 'advance'.
+// machine (lib/flow.ts). The blob never unmounts — chrome and step content
+// animate around it while its `layout` prop glides it to each new spot. The
+// one side effect owned here is the thinking-beat timer.
 export function Quiz() {
   const [{ step, answers }, dispatch] = useReducer(quizFlowReducer, INITIAL_FLOW);
-  // Holds the pending wind-up while the blob "thinks". Cleared on unmount.
   const thinkTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(thinkTimer.current), []);
 
-  // While in 'quiz' the current question is always the one after the recorded
-  // answers (see QuizFlow.answers).
+  // In 'quiz' the current question is always the one after the recorded answers.
   const index = Math.min(answers.length, questions.length - 1);
   const winner = step === 'result' ? getSpecies(scoreQuiz(answers).winnerId) : null;
 
-  // Theme takeover: override the semantic tokens for this subtree (Starscape is
-  // inside it, so the stars tint too). --accent gets the pure species color;
-  // --foreground is blended toward the base so body text stays readable even
-  // for dark accents. Retake clears the override and the base theme returns.
+  // Theme takeover for this subtree (Starscape included, so the sky tints too):
+  // --accent gets the pure species color; --foreground blends toward the base so
+  // body text stays readable for dark accents. Retake removes the override.
   const theme = winner
     ? ({
         '--accent': winner.accent,
@@ -49,18 +45,16 @@ export function Quiz() {
       <div style={theme} className="flex w-full flex-col items-center gap-10">
         <Starscape />
 
-        {/* popLayout removes the exiting headline from flow immediately, so the
-            blob starts its layout glide upward while the lines are still
-            peeling away — one motion instead of two queued ones. */}
+        {/* popLayout pops the exiting headline from flow immediately, so the
+            blob's layout glide starts while the lines are still peeling away. */}
         <AnimatePresence mode="popLayout">
           {step === 'start' && <StartScreen key="headline" />}
         </AnimatePresence>
 
         <Blob step={step} species={winner} onBegin={() => dispatch({ type: 'begin' })} />
 
-        {/* The hint gets its own popLayout island so its motion is independent of
-            the content swap below. It rises in from just below the header and sinks
-            back out — the shared restrained rise/sink (see fadeSlide). */}
+        {/* Separate island so the hint's motion is independent of the content
+            swap below. */}
         <AnimatePresence mode="popLayout">
           {step === 'start' && (
             <motion.p
@@ -76,24 +70,18 @@ export function Quiz() {
           )}
         </AnimatePresence>
 
-        {/* One content island, popLayout like the header/hint islands above: the
-            exiting card is popped out of flow the moment its exit starts — in the
-            same commit as the step change — so the column re-centers immediately
-            and the blob (layout-projected) glides down *while* the card fades.
-            mode="wait" kept the card's box until unmount, which happened outside
-            any render the blob could measure: the box vanished between frames and
-            the blob jumped. The step machine (quiz → thinking → quiz) guarantees
-            the island is empty while a card exits, so nothing overlaps. Retake
-            needs no gate for the same reason: the exiting result has no box, so
-            the landing chrome mounts in the same commit without shoving anything —
-            the result fades in place while the headline/hint settle in, and the
-            blob makes ONE glide from its result spot to its start spot (gating the
-            chrome behind onExitComplete parked the blob alone at center first). */}
+        {/* Content island. popLayout pops the exiting card out of flow the
+            moment its exit starts, so the column re-centers in the same commit
+            and the layout-projected blob glides while the card fades
+            (mode="wait" would hold the card's box until unmount and the blob
+            would jump). The step machine keeps this island empty while a card
+            exits. Retake needs no gate: the exiting result has no box, so the
+            landing chrome mounts immediately and the blob makes one glide back
+            to its start spot. */}
         <AnimatePresence
           mode="popLayout"
           onExitComplete={() => {
-            // Thinking beat: the answered card has gone — hold the enlarged blob a
-            // moment, then wind up the next question/result.
+            // Thinking beat: the answered card is gone — dwell, then wind up.
             if (step === 'thinking') {
               thinkTimer.current = setTimeout(() => dispatch({ type: 'advance' }), THINK_DWELL_MS);
             }

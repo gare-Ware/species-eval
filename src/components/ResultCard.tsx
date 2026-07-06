@@ -9,24 +9,21 @@ import { EXIT, OFFSET, PRESS, REVEAL_CASCADE, SETTLE } from '@/lib/motion';
 interface ResultCardProps {
   species: Species;
   /**
-   * Phase 3 seam: the result narrative. Defaults to the species' authored
-   * description today; the AI route will pass a personalized writeup here later
-   * with no layout change.
+   * Phase-3 seam: the AI route will pass a personalized writeup here; defaults
+   * to the species' authored description.
    */
   narrative?: string;
   onRetake: () => void;
 }
 
-// The staged reveal: the blob pop and glyph swap have already run (owned by
-// Blob), and REVEAL_CASCADE walks this card in right after them — the full
-// timeline lives in motion.ts under "Choreography beats".
-// Theme takeover (species color via --foreground/--accent) is owned by Quiz.
+// The staged reveal: the blob pop + glyph swap run first (owned by Blob), then
+// REVEAL_CASCADE walks this card in — timeline in motion.ts. Theme takeover is
+// owned by Quiz.
 const container: Variants = {
   hidden: {},
   show: { transition: REVEAL_CASCADE },
-  // Retake: the card drifts down and fades in place — popped out of flow by the
-  // content island — while the landing chrome enters around it and the blob makes
-  // its single glide back to the start layout (see Quiz's content island).
+  // Retake: drift down + fade in place while the landing chrome enters around
+  // it and the blob glides back to its start spot.
   exit: { opacity: 0, y: OFFSET, transition: EXIT },
 };
 
@@ -35,8 +32,7 @@ const item: Variants = {
   show: { opacity: 1, y: 0, transition: SETTLE },
 };
 
-// forwardRef: required by the content island's AnimatePresence mode="popLayout"
-// (it measures + pins the exiting card through this ref — see StartScreen).
+// forwardRef: popLayout pins the exiting card through this ref (see StartScreen).
 export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function ResultCard(
   { species, narrative, onRetake },
   ref,

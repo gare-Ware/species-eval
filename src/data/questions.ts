@@ -1,12 +1,9 @@
 // questions.ts
-// Canonical source for the quiz questions. Per CLAUDE.md: typed data (not JSON);
-// `satisfies` preserves literal inference and a mistyped SpeciesId in `scores`
-// fails compilation.
-//
-// Authored as a starting point — edit prose and weights freely. Each chosen
-// option awards weighted points to one or more species; the winner is the
-// highest tally (see lib/scoring.ts). Options below mostly award a primary 2 with
-// the occasional secondary 1 where two species genuinely overlap.
+// Canonical source for the quiz questions — typed data, so a mistyped SpeciesId
+// in `scores` fails compilation (`satisfies` preserves literal inference).
+// Each chosen option awards weighted points to one or more species; highest
+// tally wins (lib/scoring.ts). Options award a primary 2, with an occasional
+// secondary 1 where two species genuinely overlap.
 
 import type { SpeciesId } from './species';
 
