@@ -1,9 +1,9 @@
 'use client';
 
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import { motion } from 'motion/react';
 import type { Option, Question } from '@/data/questions';
-import { fadeSlide, PRESS_ROW, SETTLE, SNAPPY } from '@/lib/motion';
+import { fadeSlide, PICKED, PRESS_ROW, SETTLE, SNAPPY, UNPICKED } from '@/lib/motion';
 
 interface QuestionCardProps {
   question: Question;
@@ -26,6 +26,19 @@ export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function 
   { question, index, total, onAnswer },
   ref,
 ) {
+  // The confirm beat: remember which row was chosen so it can acknowledge the
+  // pick during the card's exit. Local state only — the card remounts per
+  // question (keyed by question id in Quiz), so it resets itself.
+  const [picked, setPicked] = useState<string | null>(null);
+
+  function pick(option: Option) {
+    if (picked) return; // the flow machine also guards this; keep the visual honest too
+    setPicked(option.label);
+    // Answering proceeds immediately — the confirm beat rides the exit, it never
+    // delays it (the user's click buys speed; see design notes).
+    onAnswer(option);
+  }
+
   return (
     <motion.section
       ref={ref}
@@ -52,19 +65,30 @@ export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function 
       <h2 className="text-2xl font-semibold sm:text-3xl">{question.prompt}</h2>
 
       <ul className="flex flex-col gap-3">
-        {question.options.map((option) => (
-          <li key={option.label}>
-            <motion.button
-              type="button"
-              onClick={() => onAnswer(option)}
-              {...PRESS_ROW}
-              transition={SNAPPY}
-              className="w-full rounded-xl border border-foreground/10 bg-foreground/[0.04] px-5 py-4 text-left transition-colors hover:border-foreground/35 hover:bg-foreground/[0.08]"
-            >
-              {option.label}
-            </motion.button>
-          </li>
-        ))}
+        {question.options.map((option) => {
+          const isPicked = picked === option.label;
+          return (
+            <li key={option.label}>
+              {/* Confirm beat, zero added latency: the chosen row inverts (CSS
+                  color flip) and pops up a touch (PICKED) while the others dim
+                  (UNPICKED) — the pick reads as the survivor as the card exits. */}
+              <motion.button
+                type="button"
+                onClick={() => pick(option)}
+                {...PRESS_ROW}
+                animate={picked ? (isPicked ? PICKED : UNPICKED) : undefined}
+                transition={SNAPPY}
+                className={`w-full rounded-xl border px-5 py-4 text-left transition-colors ${
+                  isPicked
+                    ? 'border-foreground bg-foreground text-background'
+                    : 'border-foreground/10 bg-foreground/[0.04] hover:border-foreground/35 hover:bg-foreground/[0.08]'
+                }`}
+              >
+                {option.label}
+              </motion.button>
+            </li>
+          );
+        })}
       </ul>
     </motion.section>
   );
