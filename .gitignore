@@ -26,6 +26,7 @@
 
 # local-only notes
 CLAUDE.local.md
+AGENTS.local.md
 
 # debug
 npm-debug.log*
