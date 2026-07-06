@@ -149,9 +149,9 @@ export const ACTIVE_SPECIES_IDS = [
 
 const activeIdSet = new Set<SpeciesId>(ACTIVE_SPECIES_IDS);
 
-export const activeSpecies: Species[] = ACTIVE_SPECIES_IDS.map(
-  (id) => species.find((s) => s.id === id)!,
-);
+// getSpecies (not a bare find + `!`) so a roster id without an authored entry
+// fails loudly at module load instead of smuggling `undefined` downstream.
+export const activeSpecies: Species[] = ACTIVE_SPECIES_IDS.map((id) => getSpecies(id));
 
 export function getSpecies(id: SpeciesId): Species {
   const found = species.find((s) => s.id === id);
