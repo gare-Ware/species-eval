@@ -4,7 +4,7 @@ import { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
 import type { Species } from '@/data/species';
-import { EXIT, PRESS, SETTLE, stagger } from '@/lib/motion';
+import { EXIT, OFFSET, PRESS, REVEAL_CASCADE, SETTLE } from '@/lib/motion';
 
 interface ResultCardProps {
   species: Species;
@@ -17,18 +17,17 @@ interface ResultCardProps {
   onRetake: () => void;
 }
 
-// The staged reveal, beat by beat: the blob has already sprung to full size and
-// swapped in the species glyph (~0.4s, owned by Blob); delayChildren starts this
-// cascade right after, and the stagger walks down the card — kicker, name,
-// tagline, body, traits, retake — landing the whole sequence around the 2s mark.
+// The staged reveal: the blob pop and glyph swap have already run (owned by
+// Blob), and REVEAL_CASCADE walks this card in right after them — the full
+// timeline lives in motion.ts under "Choreography beats".
 // Theme takeover (species color via --foreground/--accent) is owned by Quiz.
 const container: Variants = {
   hidden: {},
-  show: { transition: stagger(0.55, 0.11) },
+  show: { transition: REVEAL_CASCADE },
   // Retake: the card drifts down and fades in place — popped out of flow by the
   // content island — while the landing chrome enters around it and the blob makes
   // its single glide back to the start layout (see Quiz's content island).
-  exit: { opacity: 0, y: 24, transition: EXIT },
+  exit: { opacity: 0, y: OFFSET, transition: EXIT },
 };
 
 const item: Variants = {
@@ -63,7 +62,7 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
         <motion.h1
           variants={item}
           className="text-5xl font-extrabold uppercase text-accent sm:text-6xl"
-          style={{ fontStretch: '92%' }}
+          style={{ fontStretch: 'var(--display-stretch)' }}
         >
           {species.name}
         </motion.h1>

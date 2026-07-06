@@ -2,10 +2,9 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import type { Species } from '@/data/species';
-import { GLIDE, POP, PRESS_HERO } from '@/lib/motion';
+import type { Step } from '@/lib/flow';
+import { BREATHE, EXIT, GLIDE, GLYPH_POP, POP, PRESS_HERO } from '@/lib/motion';
 import { SpeciesGlyph } from './SpeciesGlyph';
-
-export type Step = 'start' | 'quiz' | 'thinking' | 'result';
 
 interface BlobProps {
   step: Step;
@@ -49,24 +48,20 @@ export function Blob({ step, species, onBegin }: BlobProps) {
       }}
       whileHover={interactive ? PRESS_HERO.whileHover : undefined}
       whileTap={interactive ? PRESS_HERO.whileTap : undefined}
-      className="relative shrink-0 rounded-full bg-accent transition-colors duration-700 [container-type:size] enabled:cursor-pointer"
+      className="relative shrink-0 rounded-full bg-accent transition-colors duration-(--theme-fade) [container-type:size] enabled:cursor-pointer"
     >
       {/* Breathing lives on an inner layer so the infinite loop never fights the
           step-driven size/position animations on the button itself. */}
-      <motion.span
-        className="absolute inset-0 grid place-items-center"
-        animate={{ scale: [1, 1.045, 1] }}
-        transition={{ duration: 2.4, ease: 'easeInOut', repeat: Infinity }}
-      >
+      <motion.span className="absolute inset-0 grid place-items-center" {...BREATHE}>
         <AnimatePresence mode="wait">
           {step === 'result' && species ? (
             <motion.span
               key={species.id}
               initial={{ scale: 0.4, opacity: 0, rotate: -10 }}
               animate={{ scale: 1, opacity: 1, rotate: 0 }}
-              // The glyph pops in just after the blob has sprung to full size — same
-              // POP overshoot, held back by delay so it lands as its own beat.
-              transition={{ ...POP, delay: 0.25 }}
+              // Second beat of the reveal: the "?" clears (EXIT, below) and the
+              // glyph pops in on GLYPH_POP — see the reveal timeline in motion.ts.
+              transition={GLYPH_POP}
               className="grid h-[58cqw] w-[58cqw] place-items-center text-background"
             >
               <SpeciesGlyph id={species.id} className="h-full w-full" />
@@ -74,7 +69,7 @@ export function Blob({ step, species, onBegin }: BlobProps) {
           ) : (
             <motion.span
               key="question-mark"
-              exit={{ scale: 0.5, opacity: 0, transition: { duration: 0.15 } }}
+              exit={{ scale: 0.5, opacity: 0, transition: EXIT }}
               className="font-extrabold text-background"
               style={{ fontSize: '54cqw', lineHeight: 1 }}
             >

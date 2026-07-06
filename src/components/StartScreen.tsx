@@ -71,7 +71,7 @@ export const StartScreen = forwardRef<HTMLElement>(function StartScreen(_props, 
               lengthAdjust="spacingAndGlyphs"
               fontSize={fontSize}
               className="fill-foreground font-sans font-extrabold"
-              style={{ fontStretch: '92%' }}
+              style={{ fontStretch: 'var(--display-stretch)' }}
             >
               {text}
             </text>
