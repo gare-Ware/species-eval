@@ -1,9 +1,17 @@
 'use client';
 
-import { forwardRef, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import type { Option, Question } from '@/data/questions';
-import { fadeSlide, PICKED, PRESS_ROW, SETTLE, SNAPPY, UNPICKED } from '@/lib/motion';
+import {
+  CONFIRM_HOLD_MS,
+  fadeSlide,
+  PICKED,
+  PRESS_ROW,
+  SETTLE,
+  SNAPPY,
+  UNPICKED,
+} from '@/lib/motion';
 
 interface QuestionCardProps {
   question: Question;
@@ -12,31 +20,26 @@ interface QuestionCardProps {
   onAnswer: (option: Option) => void;
 }
 
-// The card rises in from just below and sinks back out on exit (a short offset +
-// fade, see fadeSlide) — it never travels far. The persistent blob's vertical
-// position is handled entirely by its own `layout` projection (see Blob): when a
-// card mounts/unmounts, the centered column reflows and Motion projects the blob
-// to its new resting spot on the shared GLIDE. One mechanism, no height-ramp.
+// Rises in from below, sinks back out (fadeSlide) — the card never travels far.
+// The blob's travel is its own layout projection (see Blob).
 const card = fadeSlide('below');
 
-// forwardRef: the content island runs AnimatePresence mode="popLayout", which
-// measures + pins the exiting card through this ref (see StartScreen for the
-// full explanation of why popLayout needs it).
+// forwardRef: popLayout pins the exiting card through this ref (see StartScreen).
 export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function QuestionCard(
   { question, index, total, onAnswer },
   ref,
 ) {
-  // The confirm beat: remember which row was chosen so it can acknowledge the
-  // pick during the card's exit. Local state only — the card remounts per
-  // question (keyed by question id in Quiz), so it resets itself.
+  // Confirm beat: the chosen row inverts + pops and the rest dim immediately;
+  // onAnswer is deferred by CONFIRM_HOLD_MS so the pick registers before the
+  // exit begins. Local state — the card remounts per question (keyed in Quiz).
   const [picked, setPicked] = useState<string | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(holdTimer.current), []);
 
   function pick(option: Option) {
-    if (picked) return; // the flow machine also guards this; keep the visual honest too
+    if (picked) return;
     setPicked(option.label);
-    // Answering proceeds immediately — the confirm beat rides the exit, it never
-    // delays it (the user's click buys speed; see design notes).
-    onAnswer(option);
+    holdTimer.current = setTimeout(() => onAnswer(option), CONFIRM_HOLD_MS);
   }
 
   return (
@@ -64,14 +67,13 @@ export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function 
 
       <h2 className="text-2xl font-semibold sm:text-3xl">{question.prompt}</h2>
 
-      <ul className="flex flex-col gap-3">
+      {/* pointer-events-none during the hold: the choice is made, so hover and
+          further taps go quiet while the confirm plays. */}
+      <ul className={`flex flex-col gap-3 ${picked ? 'pointer-events-none' : ''}`}>
         {question.options.map((option) => {
           const isPicked = picked === option.label;
           return (
             <li key={option.label}>
-              {/* Confirm beat, zero added latency: the chosen row inverts (CSS
-                  color flip) and pops up a touch (PICKED) while the others dim
-                  (UNPICKED) — the pick reads as the survivor as the card exits. */}
               <motion.button
                 type="button"
                 onClick={() => pick(option)}
