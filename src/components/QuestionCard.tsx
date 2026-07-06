@@ -40,6 +40,7 @@ export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function 
   const [picked, setPicked] = useState<Option['id'] | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(holdTimer.current), []);
+  const isLocked = picked !== null;
 
   function pick(option: Option) {
     if (picked) return;
@@ -92,9 +93,9 @@ export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function 
         {question.prompt}
       </h2>
 
-      {/* pointer-events-none during the hold: the choice is made, so hover and
-          further taps go quiet while the confirm plays. */}
-      <ul className={`flex flex-col gap-3 ${picked ? 'pointer-events-none' : ''}`}>
+      {/* Native disabled exposes the confirmation lock to keyboard and AT;
+          pointer-events-none keeps hover color quiet while the confirm plays. */}
+      <ul className={`flex flex-col gap-3 ${isLocked ? 'pointer-events-none' : ''}`}>
         {question.options.map((option) => {
           const isPicked = picked === option.id;
           const pickedTarget = prefersReducedMotion ? undefined : PICKED;
@@ -104,11 +105,12 @@ export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function 
             <li key={option.id}>
               <motion.button
                 type="button"
+                disabled={isLocked}
                 onClick={() => pick(option)}
                 {...(prefersReducedMotion ? {} : PRESS_ROW)}
                 animate={rowTarget}
                 transition={SNAPPY}
-                className={`w-full rounded-xl border px-5 py-4 text-left transition-colors ${
+                className={`w-full rounded-xl border px-5 py-4 text-left transition-colors disabled:cursor-default ${
                   isPicked
                     ? 'border-foreground bg-foreground text-background'
                     : 'border-foreground/10 bg-foreground/[0.04] hover:border-foreground/35 hover:bg-foreground/[0.08]'
