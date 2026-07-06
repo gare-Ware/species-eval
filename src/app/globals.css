@@ -12,6 +12,10 @@
   --background: var(--base-background);
   --foreground: var(--base-foreground);
   --accent: var(--base-foreground);
+
+  /* Shared design constants, referenced from components so each is tunable here. */
+  --display-stretch: 92%; /* poster/display type width squeeze (headline SVG + result name) */
+  --theme-fade: 700ms; /* species theme-takeover color cross-fade (blob fill + stars) */
 }
 
 @theme inline {
@@ -36,7 +40,7 @@ body {
   position: absolute;
   border-radius: 9999px;
   background: var(--foreground);
-  transition: background-color 0.7s;
+  transition: background-color var(--theme-fade);
   animation:
     star-twinkle var(--twinkle, 4s) ease-in-out var(--delay, 0s) infinite,
     star-drift var(--drift, 14s) ease-in-out var(--delay, 0s) infinite alternate;

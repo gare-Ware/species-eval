@@ -2,10 +2,9 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import type { Species } from '@/data/species';
-import { GLIDE, POP, PRESS_HERO } from '@/lib/motion';
+import type { Step } from '@/lib/flow';
+import { BREATHE, EXIT, GLIDE, GLYPH_POP, POP, PRESS_HERO } from '@/lib/motion';
 import { SpeciesGlyph } from './SpeciesGlyph';
-
-export type Step = 'start' | 'quiz' | 'thinking' | 'result';
 
 interface BlobProps {
   step: Step;
@@ -14,11 +13,9 @@ interface BlobProps {
   onBegin: () => void;
 }
 
-// One persistent element across every step — it never unmounts, it just changes
-// size (animate) and position (layout, when siblings come and go). That
-// continuity is what makes the flow read as one scene instead of separate pages.
-// `thinking` is the between-question beat: the card empties out and the blob
-// enlarges + recenters here, so differing question heights never jump (see Quiz).
+// The one persistent element: never unmounts, only changes size (animate) and
+// position (layout) — the continuity that makes the flow read as one scene.
+// 'thinking' is the enlarged between-question size.
 const SIZE: Record<Step, number> = { start: 152, quiz: 64, thinking: 120, result: 168 };
 
 export function Blob({ step, species, onBegin }: BlobProps) {
@@ -26,47 +23,38 @@ export function Blob({ step, species, onBegin }: BlobProps) {
 
   return (
     <motion.button
-      // Position-only layout glide: size is the explicit width/height animate
-      // below, so the projection only handles position (its GLIDE is shared with
-      // the start-chrome). This drives the blob on the step re-renders — start↔
-      // quiz↔result and the wind-up *up* out of the thinking beat. The *down*
-      // glide between questions is driven instead by the leaving card collapsing
-      // its height (QuestionCard), which re-centers the column under the blob —
-      // projection alone wasn't catching that re-center (blob sits above the gap).
+      // Position-only projection: size is the explicit width/height animate, so
+      // `layout` handles just position. Step re-renders drive the glides; the
+      // *down* glide between questions comes from the leaving card collapsing
+      // the column, which projection re-centers under the blob.
       layout="position"
       type="button"
       aria-label={interactive ? 'Begin the quiz' : undefined}
       disabled={!interactive}
       onClick={interactive ? onBegin : undefined}
       animate={{ width: SIZE[step], height: SIZE[step] }}
-      // Size: the result reveal rides POP (a springy overshoot) — that bounce *is*
-      // the "blob pulses" beat; every other size change rides the calm GLIDE.
-      // Position: the `layout` glide is pinned to the shared GLIDE so the blob and
-      // the start-chrome (headline, hint) travel on the same spring.
+      // Size: the result rides POP (the reveal bounce); everything else the calm
+      // GLIDE. Position: pinned to the shared GLIDE so blob and chrome travel on
+      // one spring.
       transition={{
         ...(step === 'result' ? POP : GLIDE),
         layout: GLIDE,
       }}
       whileHover={interactive ? PRESS_HERO.whileHover : undefined}
       whileTap={interactive ? PRESS_HERO.whileTap : undefined}
-      className="relative shrink-0 rounded-full bg-accent transition-colors duration-700 [container-type:size] enabled:cursor-pointer"
+      className="relative shrink-0 rounded-full bg-accent transition-colors duration-(--theme-fade) [container-type:size] enabled:cursor-pointer"
     >
-      {/* Breathing lives on an inner layer so the infinite loop never fights the
-          step-driven size/position animations on the button itself. */}
-      <motion.span
-        className="absolute inset-0 grid place-items-center"
-        animate={{ scale: [1, 1.045, 1] }}
-        transition={{ duration: 2.4, ease: 'easeInOut', repeat: Infinity }}
-      >
+      {/* Inner layer: the breathing loop stays off the step-driven button springs. */}
+      <motion.span className="absolute inset-0 grid place-items-center" {...BREATHE}>
         <AnimatePresence mode="wait">
           {step === 'result' && species ? (
             <motion.span
               key={species.id}
               initial={{ scale: 0.4, opacity: 0, rotate: -10 }}
               animate={{ scale: 1, opacity: 1, rotate: 0 }}
-              // The glyph pops in just after the blob has sprung to full size — same
-              // POP overshoot, held back by delay so it lands as its own beat.
-              transition={{ ...POP, delay: 0.25 }}
+              // Second reveal beat: the "?" clears on EXIT and the glyph pops in
+              // on GLYPH_POP (timeline in motion.ts).
+              transition={GLYPH_POP}
               className="grid h-[58cqw] w-[58cqw] place-items-center text-background"
             >
               <SpeciesGlyph id={species.id} className="h-full w-full" />
@@ -74,7 +62,7 @@ export function Blob({ step, species, onBegin }: BlobProps) {
           ) : (
             <motion.span
               key="question-mark"
-              exit={{ scale: 0.5, opacity: 0, transition: { duration: 0.15 } }}
+              exit={{ scale: 0.5, opacity: 0, transition: EXIT }}
               className="font-extrabold text-background"
               style={{ fontSize: '54cqw', lineHeight: 1 }}
             >

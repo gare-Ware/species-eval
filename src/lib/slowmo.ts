@@ -5,7 +5,8 @@ import type { Transition } from 'motion/react';
 // shape: springs are scaled so their damping ratio is unchanged (same overshoot /
 // settle character, just slower), tweens/delays/staggers are multiplied directly.
 //
-// Usage: wrap a transition — `transition={slow({ type: 'spring', ... })}`.
+// Usage: wrap a transition — `transition={slow({ type: 'spring', ... })}` — or a
+// raw millisecond beat — `slowMs(350)` — for setTimeout-driven choreography.
 // Reset to 1 before committing. The wrappers are harmless at 1, so they can stay.
 export const SLOWMO: number = 1; // 1 = real time · 5 ≈ the ~2s slow-mo for analysis
 
@@ -40,4 +41,11 @@ function scale(value: unknown, k: number): unknown {
 
 export function slow(transition: Transition): Transition {
   return SLOWMO === 1 ? transition : (scale(transition, SLOWMO) as Transition);
+}
+
+// For timer-driven beats (setTimeout durations) that live outside a Transition
+// object, so choreography held in plain milliseconds stretches with the toggle
+// too — no component multiplies by SLOWMO itself.
+export function slowMs(ms: number): number {
+  return ms * SLOWMO;
 }

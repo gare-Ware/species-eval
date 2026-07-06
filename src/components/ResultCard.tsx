@@ -4,31 +4,27 @@ import { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import type { Variants } from 'motion/react';
 import type { Species } from '@/data/species';
-import { EXIT, PRESS, SETTLE, stagger } from '@/lib/motion';
+import { EXIT, OFFSET, PRESS, REVEAL_CASCADE, SETTLE } from '@/lib/motion';
 
 interface ResultCardProps {
   species: Species;
   /**
-   * Phase 3 seam: the result narrative. Defaults to the species' authored
-   * description today; the AI route will pass a personalized writeup here later
-   * with no layout change.
+   * Phase-3 seam: the AI route will pass a personalized writeup here; defaults
+   * to the species' authored description.
    */
   narrative?: string;
   onRetake: () => void;
 }
 
-// The staged reveal, beat by beat: the blob has already sprung to full size and
-// swapped in the species glyph (~0.4s, owned by Blob); delayChildren starts this
-// cascade right after, and the stagger walks down the card — kicker, name,
-// tagline, body, traits, retake — landing the whole sequence around the 2s mark.
-// Theme takeover (species color via --foreground/--accent) is owned by Quiz.
+// The staged reveal: the blob pop + glyph swap run first (owned by Blob), then
+// REVEAL_CASCADE walks this card in — timeline in motion.ts. Theme takeover is
+// owned by Quiz.
 const container: Variants = {
   hidden: {},
-  show: { transition: stagger(0.55, 0.11) },
-  // Retake: the card drifts down and fades in place — popped out of flow by the
-  // content island — while the landing chrome enters around it and the blob makes
-  // its single glide back to the start layout (see Quiz's content island).
-  exit: { opacity: 0, y: 24, transition: EXIT },
+  show: { transition: REVEAL_CASCADE },
+  // Retake: drift down + fade in place while the landing chrome enters around
+  // it and the blob glides back to its start spot.
+  exit: { opacity: 0, y: OFFSET, transition: EXIT },
 };
 
 const item: Variants = {
@@ -36,8 +32,7 @@ const item: Variants = {
   show: { opacity: 1, y: 0, transition: SETTLE },
 };
 
-// forwardRef: required by the content island's AnimatePresence mode="popLayout"
-// (it measures + pins the exiting card through this ref — see StartScreen).
+// forwardRef: popLayout pins the exiting card through this ref (see StartScreen).
 export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function ResultCard(
   { species, narrative, onRetake },
   ref,
@@ -63,7 +58,7 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
         <motion.h1
           variants={item}
           className="text-5xl font-extrabold uppercase text-accent sm:text-6xl"
-          style={{ fontStretch: '92%' }}
+          style={{ fontStretch: 'var(--display-stretch)' }}
         >
           {species.name}
         </motion.h1>
