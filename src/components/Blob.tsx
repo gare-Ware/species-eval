@@ -19,7 +19,7 @@ import {
   PRESS_HERO,
   REDUCED_FADE,
 } from '@/lib/motion';
-import { BLOB, blobPath, pulseSwell } from '@/lib/blob';
+import { BLOB, blobPath, pulseSwell, type BlobDeform } from '@/lib/blob';
 import { SLOWMO } from '@/lib/slowmo';
 import { SpeciesGlyph } from './SpeciesGlyph';
 
@@ -42,11 +42,12 @@ const SIZE: Record<Step, number> = { start: 152, quiz: 64, thinking: 120, result
 const THINKING_RETURN_SIZE = gulpReturnKeyframes(SIZE.quiz, SIZE.thinking);
 
 // The wobbling perimeter needs room beyond the nominal circle: the SVG box is
-// 150% of the button, and the viewBox reserves the same 1.5× in unit space.
-// Worst case from lib/blob.ts: 1 + waves + breathe + sag + maxDrag + maxLag
-// + pulse ≈ 1.31 — blob.test.ts pins the shape inside this box. (The gulp
-// scales the whole button, SVG included, so it can't push the shape out.)
-const OVERDRAW = 1.5;
+// 200% of the button, and the viewBox reserves the same 2× in unit space.
+// Worst case stacks full churn + piled flares + a hard glide: 1 + boosted
+// waves + breathe + pulse + sag + flare cap + maxDrag + maxLag ≈ 1.93 —
+// blob.test.ts pins the shape inside this box. (The gulp scales the whole
+// button, SVG included, so it can't push the shape out.)
+const OVERDRAW = 2;
 
 // SSR/initial shape (t=0, at rest) — the frame loop takes over on mount.
 const REST_PATH = blobPath(0);
@@ -95,6 +96,12 @@ export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobP
     // engine's pulseSwell is pure; the randomness lives only here.
     let pulseAt = -Infinity;
     let nextPulseAt = t + within(BLOB.pulse.firstGap);
+    // Escape-attempt schedule + churn (engine math is pure; randomness and
+    // accumulation live only here, like the pulse).
+    const flares: { dir: number; width: number; amp: number; at: number }[] = [];
+    let nextFlareAt = t + within(BLOB.flare.gap);
+    let agitation = 0;
+    let prevSpeed = 0;
 
     const tick = (now: number) => {
       const rect = el.getBoundingClientRect();
@@ -139,18 +146,42 @@ export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobP
           }
         }
 
+        // Churn: shoves charge it, tau rings it down. Arrival from a glide is
+        // the big shove — the surface roils as the ball regroups, then settles.
+        agitation = Math.min(
+          1,
+          agitation * Math.exp(-dt / BLOB.agitation.tau) +
+            Math.abs(speed - prevSpeed) * BLOB.agitation.gain,
+        );
+        prevSpeed = speed;
+
+        // Escape attempts fire on every step — they're the ball's substance,
+        // not a UI cue, so no idle gate (contrast the pulse above, which
+        // competes with pointer scale feedback). Churn shortens the gap: the
+        // energy fights hardest right after being dragged around.
+        if (t >= nextFlareAt) {
+          flares.push({
+            dir: Math.random() * 2 * Math.PI,
+            width: within(BLOB.flare.width),
+            amp: within(BLOB.flare.amp),
+            at: t,
+          });
+          nextFlareAt = t + within(BLOB.flare.gap) * (1 - BLOB.agitation.flareRate * agitation);
+        }
+        while (flares.length && (t - flares[0].at) * BLOB.flare.decay > 8) flares.shift();
+
         // dir needs no low-speed gate: soften() in lib/blob.ts scales the
         // deform smoothly to zero, so where the direction gets noisy (the
         // tracker ringing through zero at settle) it has no amplitude to show.
-        path.setAttribute(
-          'd',
-          blobPath(t, {
-            lag: speed * BLOB.lag,
-            drag: speed * BLOB.drag,
-            dir: Math.atan2(sy, sx),
-            swell: pulseSwell(t - pulseAt),
-          }),
-        );
+        const deform: BlobDeform = {
+          lag: speed * BLOB.lag,
+          drag: speed * BLOB.drag,
+          dir: Math.atan2(sy, sx),
+          swell: pulseSwell(t - pulseAt),
+          agitation,
+          flares: flares.map((f) => ({ dir: f.dir, width: f.width, amp: f.amp, elapsed: t - f.at })),
+        };
+        path.setAttribute('d', blobPath(t, deform));
       }
       cx = x;
       cy = y;
@@ -225,8 +256,8 @@ export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobP
         <svg
           aria-hidden
           viewBox={`${-OVERDRAW} ${-OVERDRAW} ${2 * OVERDRAW} ${2 * OVERDRAW}`}
-          className="pointer-events-none absolute h-[150%] w-[150%]"
-          style={{ left: '-25%', top: '-25%' }}
+          className="pointer-events-none absolute h-[200%] w-[200%]"
+          style={{ left: '-50%', top: '-50%' }}
         >
           <path
             ref={pathRef}

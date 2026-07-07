@@ -61,18 +61,17 @@ export const PRESS_ROW = { whileTap: { scale: 0.99 } } as const;
 // not goo (the shape engine deliberately never holds an oval).
 //
 // STAGING (measured, not guessed): the step change also sends the ball on a
-// ~250px layout glide as the answered card leaves, and that glide is ~97%
-// settled ~190ms in. Playing the gulp at the step change renders fine but
-// reads as nothing — travel + 88% growth drown a ±10% scale wiggle. So the
-// gulp waits out most of the travel (GULP_DELAY), squashes on the landing
-// ball, and only then does the swell start, timed so growth and stretch release
-// together. One voice at a time: travel → squash → swell.
-//
-// GULP_DELAY is tuned so the squash BOTTOMS right at touchdown (delay + 80ms
-// ≈ the glide's ~190ms settle): the ball visibly compresses into its landing,
-// then springs up to size. Keep this close to the layout settle; too high and
-// the ball sits idle before gulping.
-export const GULP_DELAY = 0.1;
+// ~250px layout glide as the answered card leaves, touching down ~230–250ms
+// in. Playing the gulp at the step change renders fine but reads as nothing —
+// travel + 88% growth drown a ±10% scale wiggle. Worse (measured via per-frame
+// path traces): a squash that overlaps the flight CANCELS the shape engine's
+// travel sag — scaleY 0.87 against a ~1.15-tall trailing stretch nets out to
+// ~1.0, so the ball just looks inert mid-glide. So the flight belongs to the
+// sag alone, the squash BOTTOMS at touchdown (delay + 75ms ≈ the ~250ms
+// settle) — stretch-in-flight releasing into squash-on-landing is the
+// contrast that makes both read — and only then does the swell start. One
+// voice at a time: travel (sag) → squash → swell.
+export const GULP_DELAY = 0.18;
 const GULP_GROW_DELAY = GULP_DELAY + 0.07;
 const GULP_SWELL_SECONDS = 0.18; // clean grow to thinking size, no size overshoot
 const GULP_HOP_DELAY = GULP_GROW_DELAY + GULP_SWELL_SECONDS; // hop launches as the swell lands

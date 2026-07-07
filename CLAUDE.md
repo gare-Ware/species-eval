@@ -48,8 +48,10 @@ AI-generated personalized result. Human-facing overview and setup live in `READM
 ## Layout
 - `src/data/` — species, questions (+ data-integrity tests)
 - `src/lib/` — `flow` step machine · `scoring` · `motion` vocabulary + choreography beats ·
-  `blob` living-blob shape engine (waves/breathe/gravity/velocity physics; every tunable is
-  in its `BLOB` config, `BLOB.alive = false` reverts to a plain circle) · `slowmo` dev toggle
+  `blob` energy-ball shape engine (bursty waves/breathe/gravity/velocity physics, plus
+  flares — localized escape attempts vs. the containment — deceleration churn, and a travel
+  sag/regroup wake; every tunable is in its `BLOB` config, `BLOB.alive = false` reverts to a
+  plain circle) · `slowmo` dev toggle
 - `src/components/` — `Quiz` orchestrator + `StartScreen`/`QuestionCard`/`ResultCard` +
   `Blob`/`Starscape`/`SpeciesGlyph` + `Frame` (viewport poster border — currently parked:
   commented out in `Quiz`, too bright against the dark field at rest)

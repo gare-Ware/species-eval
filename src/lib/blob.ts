@@ -1,20 +1,33 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Energy-ball shape engine — pure math, no DOM. Blob.tsx drives this once per
-// frame and writes the returned path into an <svg>. The shape is a sphere of
-// radius 1 (unit space), read as energy rather than goo:
+// frame and writes the returned path into an <svg>. The design brief: chaotic
+// energy forced into a ball. An invisible force has full control; the energy
+// visibly fights it and always loses.
 //
-//   waves    — fast, shallow shimmer around the perimeter (energy = high
-//              frequency / low amplitude; goo = slow and deep — tune that way)
-//   breathe  — the whole-ball pulse (the dominant idle read)
-//   pulse    — a rare springy swell on the start screen (surprise, not rhythm)
-//   sag      — a light resting bottom bulge, so the ball still has weight
-//   velocity — the ball moves FROM ITS CENTER: the shell shifts a touch behind
-//              the true center (lag) and a focused wake trails it (tail). The
-//              leading edge stays spherical — there is deliberately no
-//              symmetric stretch term, which is what read as "oval goo".
+// The vocabulary, every visible number tunable in BLOB below:
 //
-// Every number that changes what you see lives in BLOB below. Set
-// BLOB.alive = false to revert to the plain filled circle (Blob.tsx renders
+//   waves     — fast shallow shimmer; each wave's amplitude rides its own slow
+//               bursty envelope (mod), so activity simmers irregularly instead
+//               of looping — constant-amplitude periodic ripple is exactly what
+//               read as goo
+//   breathe   — whole-ball pulse (the idle heartbeat)
+//   pulse     — rare springy whole-ball swell on the start screen
+//   flare     — the fight: a random lobe surges outward, containment snaps it
+//               back through rest, dents it slightly inward (the force
+//               overcorrecting), rings down. While a lobe pushes out the rest
+//               of the shell pulls in (counter): the same energy redistributed,
+//               never the ball growing
+//   sag       — light resting bottom bulge, so the ball still has weight
+//   velocity  — travel: the shell sits `lag` behind the true center, a broad
+//               wake trails it (drag), and the trailing hemisphere shimmers
+//               harder (streak) — the energy sags behind the glide while the
+//               leading edge stays held spherical, then sloshes forward once
+//               and regroups at settle (the underdamped tracker in Blob.tsx)
+//   agitation — churn charged by shoves (|Δspeed|, accumulated in Blob.tsx):
+//               arriving from a glide spikes the shimmer and the flare rate,
+//               then rings down — the energy roils as it regroups
+//
+// Set BLOB.alive = false to revert to the plain filled circle (Blob.tsx renders
 // a plain bg-accent disc and skips the frame loop entirely).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -27,6 +40,25 @@ export interface BlobWave {
   speed: number;
   /** Starting offset so the waves don't align at t=0. */
   phase: number;
+  /**
+   * Amplitude envelope: the crest heights themselves surge and die. depth is
+   * the swing (±depth around the base amp); the squared-sine shaping spends
+   * most of its time low and spikes high, so activity arrives in irregular
+   * simmers. Speeds incommensurate across waves so the surface never repeats.
+   */
+  mod: { speed: number; depth: number; phase: number };
+}
+
+/** A localized escape attempt — one lobe of energy surging against the shell. */
+export interface BlobFlare {
+  /** Perimeter direction the lobe pushes toward (radians, SVG space). */
+  dir: number;
+  /** Angular half-width of the bulge (radians). */
+  width: number;
+  /** Radial scale of the fight — the first visible crest reaches ~0.57 × amp. */
+  amp: number;
+  /** Seconds since the flare fired. */
+  elapsed: number;
 }
 
 export const BLOB = {
@@ -39,16 +71,17 @@ export const BLOB = {
   /**
    * Surface shimmer. Energy character lives in the speed:amp ratio — fast and
    * shallow crackles like a contained field; slow it down and deepen it and
-   * the same math turns back into goo. Keep total amp under ~0.035.
+   * the same math turns back into goo. Keep total base amp under ~0.035 (the
+   * envelopes and churn multiply on top — the overdraw test pins the ceiling).
    */
   waves: [
-    { lobes: 5, amp: 0.013, speed: 2.2, phase: 0.0 },
-    { lobes: 7, amp: 0.008, speed: -3.4, phase: 2.1 },
-    { lobes: 9, amp: 0.005, speed: 4.8, phase: 4.4 },
+    { lobes: 5, amp: 0.016, speed: 2.2, phase: 0.0, mod: { speed: 0.7, depth: 0.6, phase: 1.3 } },
+    { lobes: 7, amp: 0.01, speed: -3.4, phase: 2.1, mod: { speed: 1.1, depth: 0.7, phase: 4.2 } },
+    { lobes: 9, amp: 0.007, speed: 4.8, phase: 4.4, mod: { speed: 1.7, depth: 0.8, phase: 0.6 } },
   ] as BlobWave[],
 
   /** Whole-ball pulse: radius swings ±amp over period seconds — the idle heartbeat. */
-  breathe: { amp: 0.032, period: 2.8 },
+  breathe: { amp: 0.028, period: 2.8 },
 
   /**
    * Surprise pulse: a springy whole-ball swell fired at random intervals on the
@@ -67,34 +100,84 @@ export const BLOB = {
     firstGap: [3, 6] as [number, number], // sooner, so short visits still see one
   },
 
+  /**
+   * Escape attempts. Each flare is a lobe with a damped-sine radial envelope
+   * (flareSwell): a fast surge outward — the escape — snapped back through
+   * rest into a shallow inward dent — the containment overcorrecting — then
+   * rung down. Frequent on purpose: unlike the pulse this is the ball's
+   * substance, not a UI cue, so the fight should read as near-constant.
+   * Scheduling (random dir/width/amp, spawn cadence) lives in Blob.tsx.
+   */
+  flare: {
+    amp: [0.05, 0.11] as [number, number], // per-event radial scale
+    width: [0.55, 0.95] as [number, number], // angular half-width (radians)
+    omega: 9, // fight frequency: crest ~0.17s, dent ~0.5s, spent ~1s
+    decay: 3.2, // envelope die-off (1/s)
+    gap: [0.9, 2.4] as [number, number], // seconds between spawns at idle
+    /** Soft cap (soften()) on the summed outward push, so stacked flares can't spike. */
+    maxTotal: 0.12,
+    /**
+     * Conservation, overcorrected: the rest of the shell pulls in by counter ×
+     * the flare's mean outward push. 1 = volume-preserving; 2 reads as the
+     * force clamping down harder than the escape deserved.
+     */
+    counter: 2,
+  },
+
   /** Resting weight: a light bottom bulge so the sphere still sits in gravity. */
   sag: 0.03,
+
+  /**
+   * Churn. Blob.tsx accumulates |Δspeed| × gain into a 0–1 level that decays
+   * over tau seconds; here it multiplies the shimmer (waveGain) — and back in
+   * Blob.tsx it shortens the flare gap (flareRate): the energy fights hardest
+   * right after being dragged around. Arrival from a glide is the big shove —
+   * the ball visibly roils as it regroups, then settles back to a simmer.
+   */
+  agitation: { gain: 1 / 2600, tau: 0.55, waveGain: 0.7, flareRate: 0.55 },
+
+  /** Travel streak: extra trailing-hemisphere shimmer, ∝ normalized wake. */
+  streak: 0.8,
+  /** Hard ceiling on the combined shimmer multiplier (churn + streak). */
+  maxBoost: 2,
 
   /**
    * Center-of-gravity lag, per px/s of travel: the whole shell shifts this far
    * BEHIND the button's true center, so motion visibly originates at the core
    * and the front edge never leads. maxLag (fraction of radius) is a SOFT cap
    * (see soften()), approached asymptotically. Tuning constraint: keep the
-   * slope shallow enough that saturation lands near PEAK glide speed
-   * (~2000–3500 px/s). If the cap engages far below that, the shape rides
-   * every glide pinned at max and releases it all in the last few frames as
-   * the tracker rings through zero — a visible snap right at settle.
+   * slope set so raw ≈ max around PEAK glide speed (~2000–3500 px/s). If the
+   * cap engages far below that, the shape rides every glide pinned at max and
+   * releases it all in the last few frames as the tracker rings through zero —
+   * a visible snap right at settle. Sized to be SEEN: ~11–14% of radius at
+   * peak (the first 6%/9% caps measured correct and read as nothing).
    */
-  lag: 1 / 20000,
-  maxLag: 0.07,
+  lag: 1 / 12000,
+  maxLag: 0.16,
 
-  /** Trailing wake per px/s, soft-capped by maxDrag; tailShape focuses it (higher = narrower tail). */
-  drag: 1 / 16000,
-  maxDrag: 0.09,
-  tailShape: 3,
+  /**
+   * Trailing wake per px/s, soft-capped by maxDrag — the visible "energy sags
+   * behind, then regroups". The slope is tuned against the SHORT glide (the
+   * ~250px between-question drop only reaches ~1600 px/s tracked), so the
+   * sag reads there too, not just on the long start→quiz travel: ~27% of
+   * radius at 1600, ~35% at the big-glide peak. tailShape focuses it (higher
+   * = narrower); 2 = a broad wake across the whole back half, mass dragging
+   * rather than a needle.
+   */
+  drag: 1 / 5000,
+  maxDrag: 0.42,
+  tailShape: 2,
 
   /**
    * Deformation spring: the shape chases velocity as an underdamped spring.
    * response = natural frequency in rad/s (higher = snaps back to spherical
    * sooner); springDamping = damping ratio (<1 overshoots once — the mass
    * sloshes forward as the blob stops, then rings down; 1 = no overshoot).
+   * response also low-passes short glides: the between-question flight is a
+   * ~200ms speed pulse, and below ~24 the tracker clips too much of its peak
+   * for the sag to show.
    */
-  response: 24,
+  response: 28,
   springDamping: 0.55,
 };
 
@@ -110,6 +193,10 @@ export interface BlobDeform {
   dir: number;
   /** Uniform transient radius kick — the surprise pulse (see pulseSwell). 0/absent at rest. */
   swell?: number;
+  /** Active escape attempts (scheduling lives in Blob.tsx; the math here is pure). */
+  flares?: BlobFlare[];
+  /** 0–1 churn level (shove-charged, accumulated by the caller — see BLOB.agitation). */
+  agitation?: number;
 }
 
 export const BLOB_AT_REST: BlobDeform = { lag: 0, drag: 0, dir: 0 };
@@ -127,6 +214,19 @@ export function pulseSwell(elapsed: number, cfg: BlobConfig = BLOB): number {
 }
 
 /**
+ * A flare's radial envelope `elapsed` seconds after it fires, normalized to
+ * ±1 (BlobFlare.amp scales it). Same damped-sine family as pulseSwell — it IS
+ * the fight-and-lose curve: surge out (first crest ~0.17s), snapped back
+ * through rest (~0.35s), a shallow inward dent as the force overcorrects
+ * (~0.5s), rung down. Exactly 0 once decayed, so stale flares cost nothing.
+ */
+export function flareSwell(elapsed: number, cfg: BlobConfig = BLOB): number {
+  const { omega, decay } = cfg.flare;
+  if (elapsed < 0 || elapsed * decay > 8) return 0;
+  return Math.exp(-decay * elapsed) * Math.sin(omega * elapsed);
+}
+
+/**
  * Soft saturation for the velocity deforms: identity slope at 0 (so lag/drag
  * keep their per-px/s meaning at low speed), asymptotic to `max` — the deform
  * never sits pinned on a hard clamp only to release with a corner when the
@@ -141,23 +241,62 @@ export function blobPoints(t: number, deform: BlobDeform, cfg: BlobConfig = BLOB
   const breathe = cfg.breathe.amp * Math.sin((2 * Math.PI * t) / cfg.breathe.period);
   const lag = soften(deform.lag, cfg.maxLag);
   const drag = soften(deform.drag, cfg.maxDrag);
+  const dragNorm = drag / cfg.maxDrag; // 0..1 travel intensity, shared by the streak
   const ux = Math.cos(deform.dir);
   const uy = Math.sin(deform.dir);
+
+  // Per-wave amplitude envelopes, hoisted out of the point loop.
+  const waveAmp = cfg.waves.map((w) => {
+    const burst = (0.5 + 0.5 * Math.sin(w.mod.speed * t + w.mod.phase)) ** 2;
+    return w.amp * (1 + w.mod.depth * (2 * burst - 1));
+  });
+
+  // Churn floor of the shimmer multiplier; the trailing streak adds per-point.
+  const churn = 1 + cfg.agitation.waveGain * Math.min(deform.agitation ?? 0, 1);
+
+  // Active flares with their envelopes hoisted; only the angular window runs
+  // per point. Conservation: the mean outward push over the whole perimeter
+  // (raised-cosine window integrates to width) is pulled back uniformly at
+  // counter ×, so a fighting lobe reads as energy redistributed, never growth.
+  const flares = (deform.flares ?? [])
+    .map((f) => ({ ...f, env: f.amp * flareSwell(f.elapsed, cfg) }))
+    .filter((f) => f.env !== 0);
+  const flareMean = flares.reduce((m, f) => m + (f.env * f.width) / (2 * Math.PI), 0);
 
   const pts: [number, number][] = [];
   for (let i = 0; i < cfg.points; i++) {
     const theta = (i / cfg.points) * 2 * Math.PI;
+    const towards = Math.cos(theta) * ux + Math.sin(theta) * uy;
+    // Backward-facing hemisphere mask, shared by the wake and the streak.
+    const trail = Math.max(0, -towards);
+
     let r = 1 + breathe + (deform.swell ?? 0);
-    for (const w of cfg.waves) r += w.amp * Math.sin(w.lobes * theta + w.speed * t + w.phase);
+
+    // Shimmer: churn lifts it everywhere, the streak lifts the trailing side
+    // at speed (energy streams behind; the leading edge stays held spherical).
+    const boost = Math.min(churn + cfg.streak * dragNorm * trail, cfg.maxBoost);
+    for (let j = 0; j < cfg.waves.length; j++) {
+      const w = cfg.waves[j];
+      r += waveAmp[j] * boost * Math.sin(w.lobes * theta + w.speed * t + w.phase);
+    }
 
     // Gravity: bulge concentrated at the bottom (+y in SVG space), with a
     // small global shrink so the sag reads as mass shifting, not growing.
     const down = Math.max(0, Math.sin(theta));
     r += cfg.sag * (down * down - 0.35);
 
-    // Trailing wake: extra radius focused on the side facing away from travel
-    // (tailShape sharpens the falloff so it reads as a wake, not a bulge).
-    const trail = Math.max(0, -(Math.cos(theta) * ux + Math.sin(theta) * uy));
+    // Escape attempts: each flare is a raised-cosine lobe riding its fight
+    // envelope; the summed push is soft-capped, and the counter term pulls
+    // the whole shell in while any lobe is out (and lets it relax back out
+    // during the inward dent — the same story with the sign flipped).
+    let push = 0;
+    for (const f of flares) {
+      const d = Math.atan2(Math.sin(theta - f.dir), Math.cos(theta - f.dir));
+      if (Math.abs(d) < f.width) push += f.env * (0.5 + 0.5 * Math.cos((Math.PI * d) / f.width));
+    }
+    r += soften(push, cfg.flare.maxTotal) - cfg.flare.counter * flareMean;
+
+    // Trailing wake: extra radius focused on the side facing away from travel.
     r += drag * trail ** cfg.tailShape;
 
     // The sphere stays a sphere; the whole shell just sits `lag` behind the
