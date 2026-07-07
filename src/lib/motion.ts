@@ -55,7 +55,7 @@ export const PRESS_ROW = { whileTap: { scale: 0.99 } } as const;
 
 // Thinking-beat gulp: the blob "swallows" the answer as it enlarges into the
 // thinking size. A fast vertical squash (anticipation) releases into the size
-// spring plus a stretch overshoot (follow-through). Keyframes, not a spring:
+// swell plus a stretch overshoot (follow-through). Keyframes, not a spring:
 // squash → stretch → settle needs three stations inside ~¼s. Axis-asymmetric
 // on purpose — a gulp is vertical — but transient, so it reads as character,
 // not goo (the shape engine deliberately never holds an oval).
@@ -64,27 +64,41 @@ export const PRESS_ROW = { whileTap: { scale: 0.99 } } as const;
 // ~250px layout glide as the answered card leaves, and that glide is ~97%
 // settled ~190ms in. Playing the gulp at the step change renders fine but
 // reads as nothing — travel + 88% growth drown a ±10% scale wiggle. So the
-// gulp waits out the travel (GULP_DELAY), squashes on the landing ball, and
-// only then does the enlargement spring off (GULP_SIZE), timed so growth and
-// stretch release together. One voice at a time: travel → squash → swell.
+// gulp waits out most of the travel (GULP_DELAY), squashes on the landing
+// ball, and only then does the swell start, timed so growth and stretch release
+// together. One voice at a time: travel → squash → swell.
 //
 // GULP_DELAY is tuned so the squash BOTTOMS right at touchdown (delay + 80ms
 // ≈ the glide's ~190ms settle): the ball visibly compresses into its landing,
-// then springs up to size — raise it and the ball instead sits idle for a
-// beat before gulping.
-export const GULP_DELAY = 0.12;
+// then springs up to size. Keep this close to the layout settle; too high and
+// the ball sits idle before gulping.
+export const GULP_DELAY = 0.1;
+const GULP_GROW_DELAY = GULP_DELAY + 0.07;
+const GULP_SWELL_SECONDS = 0.18; // clean grow to thinking size, no size overshoot
+const GULP_HOP_DELAY = GULP_GROW_DELAY + GULP_SWELL_SECONDS; // hop launches as the swell lands
+const GULP_HOP_RISE_SECONDS = 0.14;
+const GULP_HOP_FALL_SECONDS = 0.18;
+const GULP_HOP_SECONDS = GULP_HOP_RISE_SECONDS + GULP_HOP_FALL_SECONDS;
+const GULP_SHRINK_SECONDS = 0.17;
+// The shrink starts this far before the hop's descent finishes, so the float
+// down melts into the deflate with no rest at the bottom.
+const GULP_SHRINK_OVERLAP = 0.09;
+const GULP_SHRINK_DELAY = GULP_HOP_DELAY + GULP_HOP_SECONDS - GULP_SHRINK_OVERLAP;
+// The size track: swell → hold (under the hop) → shrink, ending the beat.
+const GULP_RETURN_SECONDS = GULP_SHRINK_DELAY - GULP_GROW_DELAY + GULP_SHRINK_SECONDS;
+const GULP_RETURN_BUFFER = 0.04;
 export const GULP_KEYFRAMES: { scaleX: number[]; scaleY: number[] } = {
   scaleX: [1, 1.07, 0.97, 1],
   scaleY: [1, 0.87, 1.06, 1],
 };
 export const GULP: Transition = slow({
   delay: GULP_DELAY,
-  duration: 0.26,
+  duration: 0.25,
   times: [0, 0.3, 0.65, 1],
   ease: ['easeOut', 'easeInOut', 'easeOut'],
 });
 // The thinking-size enlargement, held back until the squash bottoms out
-// (GULP's first station lands at delay + 0.3 × duration ≈ delay + 80ms).
+// (GULP's first station lands at delay + 0.3 × duration ≈ delay + 75ms).
 // Deliberately underdamped: the ball springs up to size and lands with one
 // small life-like bounce (~12% overshoot ≈ 7px at thinking size). POP's
 // little sibling — same stiffness family, more damping, so the result reveal
@@ -93,7 +107,40 @@ export const GULP_SIZE: Transition = slow({
   type: 'spring',
   stiffness: 380,
   damping: 22,
-  delay: GULP_DELAY + 0.08,
+  delay: GULP_GROW_DELAY,
+});
+// Between questions, the blob finishes its thought before the next card enters,
+// and the springy bounce is POSITION, not size. During the thinking beat the
+// ball is the only thing in the vertically centered column, so a size wiggle
+// moves both edges symmetrically around a pinned center — a stationary throb
+// that reads as stutter, not a bounce (measured: center held within 0.3px while
+// the edges fluttered ±6px). So each channel speaks once: the size swells clean
+// to the thinking size, holds while the ball HOPS (y keyframes below — the
+// whole ball rises and floats back down), then shrinks back to the quiz size
+// still centered, the deflate overlapping the descent. The next step change is
+// position-only, so the glide up chains straight off the return.
+export function gulpReturnKeyframes(quizSize: number, thinkingSize: number): number[] {
+  return [quizSize, thinkingSize, thinkingSize, quizSize];
+}
+export const GULP_RETURN_SIZE: Transition = slow({
+  delay: GULP_GROW_DELAY,
+  duration: GULP_RETURN_SECONDS,
+  times: [0, GULP_SWELL_SECONDS / GULP_RETURN_SECONDS, 1 - GULP_SHRINK_SECONDS / GULP_RETURN_SECONDS, 1],
+  ease: ['easeOut', 'linear', 'easeInOut'],
+});
+// The hop floats, it doesn't land: easeOut up to a hanging apex, then an
+// easeInOut float back down that arrives at rest with ~zero velocity. No
+// ballistic easeIn drop and no rebound — those read as ground contact (and
+// hand the velocity-reactive shape engine an impact to squash against, which
+// is where the "micro hops on landing" came from). The shrink starts
+// GULP_SHRINK_OVERLAP before the descent finishes, so the float melts straight
+// into the deflate and the whole beat reads as one continuous glide.
+export const GULP_HOP_KEYFRAMES: { y: number[] } = { y: [0, -12, 0] };
+export const GULP_HOP: Transition = slow({
+  delay: GULP_HOP_DELAY,
+  duration: GULP_HOP_SECONDS,
+  times: [0, GULP_HOP_RISE_SECONDS / GULP_HOP_SECONDS, 1],
+  ease: ['easeOut', 'easeInOut'],
 });
 
 // Answer-confirm targets: the chosen row pops up a touch and holds, the rest
@@ -157,9 +204,16 @@ export function displayWeight(): number {
 export const CONFIRM_HOLD_MS = slowMs(500);
 export const REDUCED_CONFIRM_HOLD_MS = 150;
 
-// Thinking beat: hold on the empty centered blob between questions before the
-// next card winds up (a setTimeout in Quiz, hence ms).
-export const THINK_DWELL_MS = slowMs(350);
+// Thinking beat: hold on the empty centered blob between questions long enough
+// for the swell → hop → shrink to finish before the next card winds up (a
+// setTimeout in Quiz, hence ms). The gulp clocks run from the step change but
+// the timer starts at the card's exit-complete (~EXIT_SECONDS later), so the
+// exit is subtracted here — without that the ball froze ~300ms at quiz size
+// before the glide up. GULP_RETURN_BUFFER is the one breath between the
+// landing and the wind-up; raise it to hold the small centered ball longer.
+export const THINK_DWELL_MS = slowMs(
+  (GULP_GROW_DELAY + GULP_RETURN_SECONDS - EXIT_SECONDS + GULP_RETURN_BUFFER) * 1000,
+);
 export const REDUCED_THINK_DWELL_MS = 0;
 
 // Result reveal timeline: the blob pops to size (POP, in Blob) → the "?" clears

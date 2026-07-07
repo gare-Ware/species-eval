@@ -47,7 +47,7 @@ export function Quiz() {
   } else if (step === 'thinking') {
     announcement = 'Preparing the next question';
   } else if (winner) {
-    announcement = `Result: You are ${winner.name}`;
+    announcement = `Result: Species match, ${winner.name}`;
   }
   const hintVariants = prefersReducedMotion ? FADE : hint;
 
@@ -100,7 +100,12 @@ export function Quiz() {
           {step === 'start' && <StartScreen key="headline" headingRef={startHeadingRef} />}
         </AnimatePresence>
 
-        <Blob step={step} species={winner} onBegin={() => send({ type: 'begin' })} />
+        <Blob
+          step={step}
+          species={winner}
+          returnToQuizSize={step === 'thinking' && !isFinalThinkingBeat}
+          onBegin={() => send({ type: 'begin' })}
+        />
 
         {/* Separate island so the hint's motion is independent of the content
             swap below. */}
