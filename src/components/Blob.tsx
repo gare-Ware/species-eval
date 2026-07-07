@@ -9,8 +9,12 @@ import {
   GLIDE,
   GLYPH_POP,
   GULP,
+  GULP_HOP,
+  GULP_HOP_KEYFRAMES,
   GULP_KEYFRAMES,
+  GULP_RETURN_SIZE,
   GULP_SIZE,
+  gulpReturnKeyframes,
   POP,
   PRESS_HERO,
   REDUCED_FADE,
@@ -23,6 +27,8 @@ interface BlobProps {
   step: Step;
   /** The winning species — only set during the result step. */
   species: Species | null;
+  /** Between questions, shrink at center before the next card pulls the blob up. */
+  returnToQuizSize?: boolean;
   onBegin: () => void;
 }
 
@@ -30,6 +36,10 @@ interface BlobProps {
 // position (layout) — the continuity that makes the flow read as one scene.
 // 'thinking' is the enlarged between-question size.
 const SIZE: Record<Step, number> = { start: 152, quiz: 64, thinking: 120, result: 168 };
+// Between-question return stations (swell → hold under the hop → shrink);
+// their times/eases live with GULP_RETURN_SIZE in motion.ts so the pairing is
+// a one-screen edit.
+const THINKING_RETURN_SIZE = gulpReturnKeyframes(SIZE.quiz, SIZE.thinking);
 
 // The wobbling perimeter needs room beyond the nominal circle: the SVG box is
 // 150% of the button, and the viewBox reserves the same 1.5× in unit space.
@@ -43,7 +53,7 @@ const REST_PATH = blobPath(0);
 
 const within = ([min, max]: readonly [number, number]) => min + Math.random() * (max - min);
 
-export function Blob({ step, species, onBegin }: BlobProps) {
+export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobProps) {
   const prefersReducedMotion = useReducedMotion();
   const interactive = step === 'start';
   const alive = BLOB.alive && !prefersReducedMotion;
@@ -152,12 +162,15 @@ export function Blob({ step, species, onBegin }: BlobProps) {
     return () => cancelAnimationFrame(raf);
   }, [alive]);
 
-  // The thinking-beat gulp: squash-and-stretch keyframes on the scale channels,
-  // with the enlargement itself held back on GULP_SIZE so the sequence stages
-  // as travel → squash → swell (timeline rationale in motion.ts). Off the
-  // thinking step the channels pin back to 1, so an interrupted gulp can never
-  // strand the ball squashed.
+  // The thinking-beat gulp: squash-and-stretch keyframes on the scale channels.
+  // Between questions, the size runs a centered swell→hold→shrink while the
+  // ball hops on the y channel (the "bounce" is position — rationale in
+  // motion.ts), so the next quiz step is position-only; on the final answer,
+  // the blob stays large and hands off to the result pop. Off the thinking
+  // step every channel pins back to rest (scale 1, y 0), so an interrupted
+  // gulp can never strand the ball squashed or lifted.
   const gulping = step === 'thinking' && !prefersReducedMotion;
+  const returning = gulping && returnToQuizSize;
 
   return (
     <motion.button
@@ -173,8 +186,9 @@ export function Blob({ step, species, onBegin }: BlobProps) {
       disabled={!interactive}
       onClick={interactive ? onBegin : undefined}
       animate={{
-        width: SIZE[step],
-        height: SIZE[step],
+        width: returning ? THINKING_RETURN_SIZE : SIZE[step],
+        height: returning ? THINKING_RETURN_SIZE : SIZE[step],
+        y: returning ? GULP_HOP_KEYFRAMES.y : 0,
         ...(gulping ? GULP_KEYFRAMES : { scaleX: 1, scaleY: 1 }),
       }}
       // Size: the result rides POP (the reveal bounce); everything else the calm
@@ -183,7 +197,15 @@ export function Blob({ step, species, onBegin }: BlobProps) {
       transition={{
         ...(step === 'result' ? POP : GLIDE),
         layout: GLIDE,
-        ...(gulping ? { scaleX: GULP, scaleY: GULP, width: GULP_SIZE, height: GULP_SIZE } : {}),
+        ...(gulping
+          ? {
+              scaleX: GULP,
+              scaleY: GULP,
+              width: returning ? GULP_RETURN_SIZE : GULP_SIZE,
+              height: returning ? GULP_RETURN_SIZE : GULP_SIZE,
+              ...(returning ? { y: GULP_HOP } : {}),
+            }
+          : {}),
       }}
       whileHover={interactive && !prefersReducedMotion ? PRESS_HERO.whileHover : undefined}
       whileTap={interactive && !prefersReducedMotion ? PRESS_HERO.whileTap : undefined}

@@ -98,7 +98,7 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
           variants={itemVariants}
           className="font-mono text-xs uppercase tracking-[0.35em] text-foreground/50"
         >
-          You are
+          Species match
         </motion.p>
         <motion.h1
           id="result-title"

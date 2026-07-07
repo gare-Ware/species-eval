@@ -69,7 +69,8 @@ test('completes the quiz, locks answers during confirmation, and retakes cleanly
     }
   }
 
-  await expect(page.getByText(`Result: You are ${speciesCase.name}`)).toBeAttached();
+  await expect(page.locator('section[aria-labelledby="result-title"]').getByText('Species match')).toBeVisible();
+  await expect(page.getByText(`Result: Species match, ${speciesCase.name}`)).toBeAttached();
 
   await page.getByRole('button', { name: 'Take it again' }).click();
   await expect(page.getByRole('button', { name: 'Begin the quiz' })).toBeEnabled();
