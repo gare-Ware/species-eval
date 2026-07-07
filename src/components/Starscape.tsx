@@ -5,10 +5,10 @@ import { useEffect, useRef } from 'react';
 // Fixed full-viewport star field behind the quiz, drawn on ONE canvas.
 //
 // Why canvas and not per-star DOM: at hundreds of stars, each animated <span>
-// is its own composited layer, and the species theme takeover used to kick
-// off a background-color transition on every one of them at once — hundreds
-// of per-frame repaints for the length of --theme-fade, landing exactly on
-// the result/retake blob glides (the only steps that recolor the theme) and
+// is its own composited layer, and the species theme takeover would kick off
+// a background-color transition on every one of them at once — hundreds of
+// per-frame repaints for the length of --theme-fade, landing exactly on the
+// result/retake blob glides (the only steps that recolor the theme) and
 // dropping their frames. One canvas is one layer and one paint per frame at
 // any star count.
 //
@@ -116,7 +116,7 @@ export function Starscape() {
       const spanH = h + 2 * m;
       for (const s of STARS) {
         const st = still ? 0 : t + s.phase;
-        // Twinkle: base → base×FLOOR and back (the old CSS keyframes' shape).
+        // Twinkle: a cosine swing between base and base×FLOOR.
         const twinkle = still
           ? 1
           : (1 + TWINKLE_FLOOR) / 2 + ((1 - TWINKLE_FLOOR) / 2) * Math.cos((2 * Math.PI * st) / s.twinkle);

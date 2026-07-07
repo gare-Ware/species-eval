@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BLOB, BLOB_AT_REST, blobPath, blobPoints } from './blob';
+import { BLOB, BLOB_AT_REST, blobPath, blobPoints, soften } from './blob';
 
 // The Blob SVG reserves 1.5× the nominal radius (OVERDRAW in Blob.tsx); the
 // shape must stay inside that no matter what velocity the frame loop feeds in.
@@ -26,6 +26,30 @@ describe('blobPoints', () => {
     for (const [x, y] of blobPoints(3.2, HARD_DEFORM)) {
       expect(Math.hypot(x, y)).toBeLessThan(OVERDRAW);
     }
+  });
+});
+
+describe('soften', () => {
+  // Soft saturation is load-bearing: a deform that could sit pinned at a hard
+  // limit during a glide would release it all in a visible snap at settle.
+  it('never exceeds max, even for extreme inputs', () => {
+    for (const raw of [0.07, 0.5, 99]) {
+      expect(soften(raw, 0.07)).toBeLessThanOrEqual(0.07);
+    }
+  });
+
+  it('is monotone in the input', () => {
+    let prev = -1;
+    // 99 excluded: tanh saturates to exactly max in float precision there.
+    for (const raw of [0, 0.01, 0.05, 0.07, 0.2, 1]) {
+      const v = soften(raw, 0.07);
+      expect(v).toBeGreaterThan(prev);
+      prev = v;
+    }
+  });
+
+  it('keeps identity slope near zero so lag/drag keep their per-px/s meaning', () => {
+    expect(soften(0.001, 0.07)).toBeCloseTo(0.001, 4);
   });
 });
 

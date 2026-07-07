@@ -41,13 +41,13 @@
 }
 
 body {
-  /* Flat 2D field — deliberately no gradient. (To restore the old cosmic glow,
-     layer a radial-gradient above var(--background) here.) */
+  /* Flat 2D field — deliberately no gradient. (For a cosmic-glow field
+     instead, layer a radial-gradient above var(--background) here.) */
   background: var(--background);
   color: var(--foreground);
   /* --font-display, not --font-sans: @theme inline never emits --font-sans as a
      real custom property (it only inlines it into utilities), so referencing it
-     here silently fell back to the preflight system stack. */
+     here would silently fall back to the preflight system stack. */
   font-family: var(--font-display), Georgia, "Times New Roman", serif;
 }
 

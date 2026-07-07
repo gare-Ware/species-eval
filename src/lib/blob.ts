@@ -14,7 +14,7 @@
 //
 // Every number that changes what you see lives in BLOB below. Set
 // BLOB.alive = false to revert to the plain filled circle (Blob.tsx renders
-// the old bg-accent disc and skips the frame loop entirely).
+// a plain bg-accent disc and skips the frame loop entirely).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface BlobWave {
@@ -55,13 +55,18 @@ export const BLOB = {
   /**
    * Center-of-gravity lag, per px/s of travel: the whole shell shifts this far
    * BEHIND the button's true center, so motion visibly originates at the core
-   * and the front edge never leads. Capped by maxLag (fraction of radius).
+   * and the front edge never leads. maxLag (fraction of radius) is a SOFT cap
+   * (see soften()), approached asymptotically. Tuning constraint: keep the
+   * slope shallow enough that saturation lands near PEAK glide speed
+   * (~2000–3500 px/s). If the cap engages far below that, the shape rides
+   * every glide pinned at max and releases it all in the last few frames as
+   * the tracker rings through zero — a visible snap right at settle.
    */
-  lag: 1 / 2500,
+  lag: 1 / 20000,
   maxLag: 0.07,
 
-  /** Trailing wake per px/s, capped by maxDrag; tailShape focuses it (higher = narrower tail). */
-  drag: 1 / 1800,
+  /** Trailing wake per px/s, soft-capped by maxDrag; tailShape focuses it (higher = narrower tail). */
+  drag: 1 / 16000,
   maxDrag: 0.09,
   tailShape: 3,
 
@@ -79,9 +84,9 @@ export type BlobConfig = typeof BLOB;
 
 /** Velocity-derived deformation for one frame (already smoothed by the caller). */
 export interface BlobDeform {
-  /** Shell offset behind the center along `dir`, clamped to maxLag. */
+  /** Shell offset behind the center along `dir`, soft-capped by maxLag. */
   lag: number;
-  /** Trailing wake, clamped to maxDrag. */
+  /** Trailing wake, soft-capped by maxDrag. */
   drag: number;
   /** Direction of travel in radians (SVG space: +y is down). */
   dir: number;
@@ -89,11 +94,21 @@ export interface BlobDeform {
 
 export const BLOB_AT_REST: BlobDeform = { lag: 0, drag: 0, dir: 0 };
 
+/**
+ * Soft saturation for the velocity deforms: identity slope at 0 (so lag/drag
+ * keep their per-px/s meaning at low speed), asymptotic to `max` — the deform
+ * never sits pinned on a hard clamp only to release with a corner when the
+ * glide ends. Monotone, smooth, always < max.
+ */
+export function soften(raw: number, max: number): number {
+  return max * Math.tanh(raw / max);
+}
+
 /** Perimeter points at time t (seconds), in unit space (rest radius 1). */
 export function blobPoints(t: number, deform: BlobDeform, cfg: BlobConfig = BLOB): [number, number][] {
   const breathe = cfg.breathe.amp * Math.sin((2 * Math.PI * t) / cfg.breathe.period);
-  const lag = Math.min(deform.lag, cfg.maxLag);
-  const drag = Math.min(deform.drag, cfg.maxDrag);
+  const lag = soften(deform.lag, cfg.maxLag);
+  const drag = soften(deform.drag, cfg.maxDrag);
   const ux = Math.cos(deform.dir);
   const uy = Math.sin(deform.dir);
 

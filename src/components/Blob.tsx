@@ -86,12 +86,15 @@ export function Blob({ step, species, onBegin }: BlobProps) {
           sy += jy * h;
         }
         const speed = Math.hypot(sx, sy);
+        // dir needs no low-speed gate: soften() in lib/blob.ts scales the
+        // deform smoothly to zero, so where the direction gets noisy (the
+        // tracker ringing through zero at settle) it has no amplitude to show.
         path.setAttribute(
           'd',
           blobPath(t, {
             lag: speed * BLOB.lag,
             drag: speed * BLOB.drag,
-            dir: speed > 1 ? Math.atan2(sy, sx) : 0,
+            dir: Math.atan2(sy, sx),
           }),
         );
       }
