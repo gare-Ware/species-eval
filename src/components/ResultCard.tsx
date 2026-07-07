@@ -96,7 +96,9 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
         {species.traits.map((trait) => (
           <li
             key={trait}
-            className="rounded-full border border-accent/60 px-3 py-1 text-sm text-foreground/85"
+            // Label voice: mono like the eyebrows; stays outline-only so
+            // filled = pressable, outlined = metadata.
+            className="rounded-full border border-accent/60 px-3 py-1 font-mono text-xs text-foreground/85"
           >
             {trait}
           </li>
@@ -108,7 +110,8 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
           type="button"
           onClick={onRetake}
           {...(prefersReducedMotion ? {} : PRESS)}
-          className="mt-2 rounded-full border border-foreground/25 px-6 py-2.5 font-medium transition-colors hover:border-foreground/60"
+          // Control voice (mono label) + flat frost fill — see QuestionCard.
+          className="mt-2 rounded-full border border-foreground/15 bg-foreground/10 px-6 py-3 font-mono text-xs uppercase tracking-[0.2em] transition-colors hover:border-foreground/40 hover:bg-foreground/16"
         >
           Take it again
         </motion.button>

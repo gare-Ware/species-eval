@@ -23,8 +23,8 @@ const SIZE: Record<Step, number> = { start: 152, quiz: 64, thinking: 120, result
 
 // The wobbling perimeter needs room beyond the nominal circle: the SVG box is
 // 150% of the button, and the viewBox reserves the same 1.5× in unit space.
-// Worst case from lib/blob.ts: (1 + waves + breathe + sag + maxDrag) ×
-// (1 + maxStretch) ≈ 1.25 — blob.test.ts pins the shape inside this box.
+// Worst case from lib/blob.ts: 1 + waves + breathe + sag + maxDrag + maxLag
+// ≈ 1.24 — blob.test.ts pins the shape inside this box.
 const OVERDRAW = 1.5;
 
 // SSR/initial shape (t=0, at rest) — the frame loop takes over on mount.
@@ -89,7 +89,7 @@ export function Blob({ step, species, onBegin }: BlobProps) {
         path.setAttribute(
           'd',
           blobPath(t, {
-            stretch: speed * BLOB.stretch,
+            lag: speed * BLOB.lag,
             drag: speed * BLOB.drag,
             dir: speed > 1 ? Math.atan2(sy, sx) : 0,
           }),

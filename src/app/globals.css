@@ -62,41 +62,6 @@ body {
   transition: box-shadow var(--theme-fade);
 }
 
-/* Starscape. Stars use --foreground so the species takeover tints the sky too.
-   Each star floats along its own --dx/--dy vector (set in Starscape.tsx, where
-   distance scales with star size for a flat 2D parallax read) and twinkles. */
-.star {
-  position: absolute;
-  border-radius: 9999px;
-  background: var(--foreground);
-  transition: background-color var(--theme-fade);
-  animation:
-    star-twinkle var(--twinkle, 4s) ease-in-out var(--delay, 0s) infinite,
-    star-drift var(--drift, 12s) ease-in-out var(--delay, 0s) infinite alternate;
-}
-
-@keyframes star-twinkle {
-  0%,
-  100% {
-    opacity: var(--o, 0.5);
-  }
-  50% {
-    opacity: calc(var(--o, 0.5) * 0.25);
-  }
-}
-
-@keyframes star-drift {
-  from {
-    translate: 0 0;
-  }
-  to {
-    translate: var(--dx, 0px) var(--dy, -24px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .star {
-    animation: none;
-    opacity: var(--o, 0.5);
-  }
-}
+/* Starscape lives entirely in Starscape.tsx: one <canvas>, so the species
+   takeover recolors the whole sky by transitioning a single element's `color`
+   (which the draw loop samples) instead of repainting hundreds of star nodes. */

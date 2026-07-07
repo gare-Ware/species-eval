@@ -68,6 +68,11 @@ AI-generated personalized result. Human-facing overview and setup live in `READM
   `--font-display` hook — swap fonts in `layout.tsx` only. Headline is per-line SVG
   `textLength` justification in `StartScreen`; its `LINES` metrics are measured against
   Fraunces' cap-ink heights, so retune them if the font or weight changes.
+- Two type voices: Fraunces is the **content** voice (headline, question prompts, result
+  narrative); Geist Mono is the **control/label** voice (buttons, chips, eyebrows, hints).
+  Don't put the serif on pressables. Buttons use the "flat frost" fill — foreground at low
+  opacity (`bg-foreground/10` etc.) so every species theme (and future base palettes) tints
+  them for free.
 - Gotcha: `@theme inline` tokens (e.g. `--font-sans`) are not real CSS custom properties —
   plain CSS must reference `--font-display` directly, or the browser silently falls back to
   the system font.

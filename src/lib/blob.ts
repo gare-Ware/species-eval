@@ -1,14 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Living-blob shape engine — pure math, no DOM. Blob.tsx drives this once per
-// frame and writes the returned path into an <svg>. The shape is a circle of
-// radius 1 (unit space) deformed by four ingredients:
+// Energy-ball shape engine — pure math, no DOM. Blob.tsx drives this once per
+// frame and writes the returned path into an <svg>. The shape is a sphere of
+// radius 1 (unit space), read as energy rather than goo:
 //
-//   waves    — layered traveling ripples around the perimeter (the "energy
-//              held in by force" look; incommensurate speeds so it never loops)
-//   breathe  — a slow whole-ball pulse (replaces the old BREATHE scale token)
-//   sag      — a resting bottom-heavy bulge, so the ball reads as having weight
-//   velocity — squash/stretch along the direction of travel plus a trailing
-//              bulge, so the mass visibly lags and settles when the blob glides
+//   waves    — fast, shallow shimmer around the perimeter (energy = high
+//              frequency / low amplitude; goo = slow and deep — tune that way)
+//   breathe  — the whole-ball pulse (the dominant idle read)
+//   sag      — a light resting bottom bulge, so the ball still has weight
+//   velocity — the ball moves FROM ITS CENTER: the shell shifts a touch behind
+//              the true center (lag) and a focused wake trails it (tail). The
+//              leading edge stays spherical — there is deliberately no
+//              symmetric stretch term, which is what read as "oval goo".
 //
 // Every number that changes what you see lives in BLOB below. Set
 // BLOB.alive = false to revert to the plain filled circle (Blob.tsx renders
@@ -33,61 +35,64 @@ export const BLOB = {
   /** Perimeter samples. More = smoother, slower. 24–40 is the useful range. */
   points: 28,
 
-  /** Surface ripples. Keep total amp under ~0.04 so idle stays visibly circular. */
+  /**
+   * Surface shimmer. Energy character lives in the speed:amp ratio — fast and
+   * shallow crackles like a contained field; slow it down and deepen it and
+   * the same math turns back into goo. Keep total amp under ~0.035.
+   */
   waves: [
-    { lobes: 3, amp: 0.014, speed: 0.9, phase: 0.0 },
-    { lobes: 5, amp: 0.009, speed: -1.5, phase: 2.1 },
-    { lobes: 7, amp: 0.006, speed: 2.3, phase: 4.4 },
+    { lobes: 5, amp: 0.013, speed: 2.2, phase: 0.0 },
+    { lobes: 7, amp: 0.008, speed: -3.4, phase: 2.1 },
+    { lobes: 9, amp: 0.005, speed: 4.8, phase: 4.4 },
   ] as BlobWave[],
 
-  /** Whole-ball pulse: radius swings ±amp over period seconds. */
-  breathe: { amp: 0.028, period: 3.4 },
+  /** Whole-ball pulse: radius swings ±amp over period seconds — the idle heartbeat. */
+  breathe: { amp: 0.032, period: 2.8 },
 
-  /** Resting weight: extra radius at the bottom (gravity's fingerprint). */
-  sag: 0.045,
-
-  /** Squash/stretch per px/s of travel (elongates along the motion vector). */
-  stretch: 1 / 3200,
-
-  /** Trailing bulge per px/s (the mass that lags behind the direction of travel). */
-  drag: 1 / 2000,
+  /** Resting weight: a light bottom bulge so the sphere still sits in gravity. */
+  sag: 0.03,
 
   /**
-   * Separate caps (fractions of radius) keep the travel shape "a circle with
-   * sagging mass": stretch is pinned low so the ball never goes oval, while
-   * the trailing bulge is allowed roughly twice as much.
+   * Center-of-gravity lag, per px/s of travel: the whole shell shifts this far
+   * BEHIND the button's true center, so motion visibly originates at the core
+   * and the front edge never leads. Capped by maxLag (fraction of radius).
    */
-  maxStretch: 0.055,
-  maxDrag: 0.1,
+  lag: 1 / 2500,
+  maxLag: 0.07,
+
+  /** Trailing wake per px/s, capped by maxDrag; tailShape focuses it (higher = narrower tail). */
+  drag: 1 / 1800,
+  maxDrag: 0.09,
+  tailShape: 3,
 
   /**
    * Deformation spring: the shape chases velocity as an underdamped spring.
-   * response = natural frequency in rad/s (higher = snaps back to circular
+   * response = natural frequency in rad/s (higher = snaps back to spherical
    * sooner); springDamping = damping ratio (<1 overshoots once — the mass
    * sloshes forward as the blob stops, then rings down; 1 = no overshoot).
    */
-  response: 20,
-  springDamping: 0.6,
+  response: 24,
+  springDamping: 0.55,
 };
 
 export type BlobConfig = typeof BLOB;
 
 /** Velocity-derived deformation for one frame (already smoothed by the caller). */
 export interface BlobDeform {
-  /** Elongation along `dir`, clamped to maxStretch. */
-  stretch: number;
-  /** Trailing-side bulge, clamped to maxDrag. */
+  /** Shell offset behind the center along `dir`, clamped to maxLag. */
+  lag: number;
+  /** Trailing wake, clamped to maxDrag. */
   drag: number;
   /** Direction of travel in radians (SVG space: +y is down). */
   dir: number;
 }
 
-export const BLOB_AT_REST: BlobDeform = { stretch: 0, drag: 0, dir: 0 };
+export const BLOB_AT_REST: BlobDeform = { lag: 0, drag: 0, dir: 0 };
 
 /** Perimeter points at time t (seconds), in unit space (rest radius 1). */
 export function blobPoints(t: number, deform: BlobDeform, cfg: BlobConfig = BLOB): [number, number][] {
   const breathe = cfg.breathe.amp * Math.sin((2 * Math.PI * t) / cfg.breathe.period);
-  const stretch = Math.min(deform.stretch, cfg.maxStretch);
+  const lag = Math.min(deform.lag, cfg.maxLag);
   const drag = Math.min(deform.drag, cfg.maxDrag);
   const ux = Math.cos(deform.dir);
   const uy = Math.sin(deform.dir);
@@ -103,17 +108,14 @@ export function blobPoints(t: number, deform: BlobDeform, cfg: BlobConfig = BLOB
     const down = Math.max(0, Math.sin(theta));
     r += cfg.sag * (down * down - 0.35);
 
-    // Mass lag: extra radius on the side facing away from the travel direction.
+    // Trailing wake: extra radius focused on the side facing away from travel
+    // (tailShape sharpens the falloff so it reads as a wake, not a bulge).
     const trail = Math.max(0, -(Math.cos(theta) * ux + Math.sin(theta) * uy));
-    r += drag * trail * trail;
+    r += drag * trail ** cfg.tailShape;
 
-    // Squash & stretch: elongate along the travel axis, thin the perpendicular
-    // by the inverse so the area (the "energy") stays roughly conserved.
-    const x = r * Math.cos(theta);
-    const y = r * Math.sin(theta);
-    const par = (x * ux + y * uy) * (1 + stretch);
-    const perp = (-x * uy + y * ux) / (1 + stretch);
-    pts.push([par * ux - perp * uy, par * uy + perp * ux]);
+    // The sphere stays a sphere; the whole shell just sits `lag` behind the
+    // true center, so the core visibly leads and the shell follows.
+    pts.push([r * Math.cos(theta) - lag * ux, r * Math.sin(theta) - lag * uy]);
   }
   return pts;
 }

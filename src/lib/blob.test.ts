@@ -5,7 +5,7 @@ import { BLOB, BLOB_AT_REST, blobPath, blobPoints } from './blob';
 // shape must stay inside that no matter what velocity the frame loop feeds in.
 const OVERDRAW = 1.5;
 
-const HARD_DEFORM = { stretch: 99, drag: 99, dir: Math.PI / 3 };
+const HARD_DEFORM = { lag: 99, drag: 99, dir: Math.PI / 3 };
 
 describe('blobPoints', () => {
   it('samples the configured number of perimeter points', () => {

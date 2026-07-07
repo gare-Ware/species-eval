@@ -110,10 +110,13 @@ export const QuestionCard = forwardRef<HTMLElement, QuestionCardProps>(function 
                 {...(prefersReducedMotion ? {} : PRESS_ROW)}
                 animate={rowTarget}
                 transition={SNAPPY}
-                className={`w-full rounded-xl border px-5 py-4 text-left transition-colors disabled:cursor-default ${
+                // Control voice: mono (the app's chrome/label face), not the
+                // Fraunces content voice. Flat frost fill = foreground at low
+                // opacity, so every species theme tints it automatically.
+                className={`w-full rounded-xl border px-5 py-4 text-left font-mono text-sm transition-colors disabled:cursor-default ${
                   isPicked
                     ? 'border-foreground bg-foreground text-background'
-                    : 'border-foreground/10 bg-foreground/4 hover:border-foreground/35 hover:bg-foreground/8'
+                    : 'border-foreground/15 bg-foreground/10 hover:border-foreground/40 hover:bg-foreground/16'
                 }`}
               >
                 {option.label}
