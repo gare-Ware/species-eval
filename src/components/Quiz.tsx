@@ -10,6 +10,9 @@ import { INITIAL_FLOW, quizFlowReducer } from '@/lib/flow';
 import { scoreQuiz } from '@/lib/scoring';
 import { FADE, fadeSlide, REDUCED_THINK_DWELL_MS, THINK_DWELL_MS } from '@/lib/motion';
 import { Starscape } from './Starscape';
+// Frame is parked, not gone: the accent border read too bright against the dark
+// field at rest. Re-enable by uncommenting this and <Frame /> below.
+// import { Frame } from './Frame';
 import { Blob } from './Blob';
 import { StartScreen } from './StartScreen';
 import { QuestionCard } from './QuestionCard';
@@ -89,6 +92,7 @@ export function Quiz() {
           {announcement}
         </p>
         <Starscape />
+        {/* <Frame /> */}
 
         {/* popLayout pops the exiting headline from flow immediately, so the
             blob's layout glide starts while the lines are still peeling away. */}

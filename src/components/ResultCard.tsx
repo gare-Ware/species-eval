@@ -78,8 +78,8 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
           ref={headingRef}
           tabIndex={-1}
           variants={itemVariants}
-          className="text-5xl font-extrabold uppercase text-accent focus:outline-none sm:text-6xl"
-          style={{ fontStretch: 'var(--display-stretch)' }}
+          className="text-5xl uppercase text-accent focus:outline-none sm:text-6xl"
+          style={{ fontStretch: 'var(--display-stretch)', fontWeight: 'var(--display-weight)' }}
         >
           {species.name}
         </motion.h1>

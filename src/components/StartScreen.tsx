@@ -14,10 +14,15 @@ interface StartScreenProps {
 // line to the same measure (true magazine justification, which CSS can't do);
 // the per-line font sizes keep the stretch correction small enough not to
 // distort glyphs. The question mark deliberately lives in the blob, not here.
+// Metrics measured against Fraunces at weight 900/opsz 144 (flat caps 0.700em,
+// round caps overshoot to 0.714em above and 0.014em below the baseline):
+// fontSize puts each line's natural width ≈ 985 so textLength adds only a hair
+// of tracking; baseline = 0.714em + 1; height = baseline + the below-overshoot.
+// Retune if the font or --display-weight changes.
 const LINES = [
-  { text: 'What', fontSize: 318, height: 240, baseline: 232 },
-  { text: 'Species', fontSize: 248, height: 188, baseline: 181 },
-  { text: 'Are You', fontSize: 228, height: 172, baseline: 166 },
+  { text: 'WHAT', fontSize: 318, height: 234, baseline: 228 },
+  { text: 'SPECIES', fontSize: 235, height: 174, baseline: 169 },
+  { text: 'ARE YOU', fontSize: 232, height: 172, baseline: 167 },
 ];
 
 // Per-line peel stagger. 0 = the lines settle in and out in unison; raise it
@@ -55,7 +60,11 @@ export const StartScreen = forwardRef<HTMLElement, StartScreenProps>(function St
   return (
     <motion.header
       ref={ref}
-      className="flex w-full flex-col gap-2"
+      // Billboard sizing: wider than the reading column, capped by viewport
+      // height so the start screen never scrolls — see --headline-width in
+      // globals.css. shrink-0 lets it exceed the max-w-xl shell and stay centered.
+      className="flex shrink-0 flex-col gap-2"
+      style={{ width: 'var(--headline-width)' }}
       variants={containerVariants}
       initial="hidden"
       animate="show"
@@ -85,8 +94,8 @@ export const StartScreen = forwardRef<HTMLElement, StartScreenProps>(function St
               textLength="1000"
               lengthAdjust="spacingAndGlyphs"
               fontSize={fontSize}
-              className="fill-foreground font-sans font-extrabold"
-              style={{ fontStretch: 'var(--display-stretch)' }}
+              className="fill-foreground font-sans"
+              style={{ fontStretch: 'var(--display-stretch)', fontWeight: 'var(--display-weight)' }}
             >
               {text}
             </text>

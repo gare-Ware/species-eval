@@ -48,14 +48,26 @@ AI-generated personalized result. Human-facing overview and setup live in `READM
 ## Layout
 - `src/data/` — species, questions (+ data-integrity tests)
 - `src/lib/` — `flow` step machine · `scoring` · `motion` vocabulary + choreography beats ·
-  `slowmo` dev toggle
+  `blob` living-blob shape engine (waves/breathe/gravity/velocity physics; every tunable is
+  in its `BLOB` config, `BLOB.alive = false` reverts to a plain circle) · `slowmo` dev toggle
 - `src/components/` — `Quiz` orchestrator + `StartScreen`/`QuestionCard`/`ResultCard` +
-  `Blob`/`Starscape`/`SpeciesGlyph`
+  `Blob`/`Starscape`/`SpeciesGlyph` + `Frame` (viewport poster border — currently parked:
+  commented out in `Quiz`, too bright against the dark field at rest)
 
 ## Theming & type
 - `--base-background`/`--base-foreground` in `globals.css` are the only place the base palette
   lives. `Quiz` overrides `--foreground`/`--accent` inline for the species takeover; retake
   clears it. Components use `bg-background`/`text-foreground`/`text-accent` (+ opacity
   modifiers), never raw white/black.
-- Display font: Bricolage Grotesque (variable: wght/wdth/opsz via `next/font`). Headline is
-  per-line SVG `textLength` justification in `StartScreen` — tune line sizes there.
+- Phase-3 chrome is token-driven from `globals.css`: `--frame-width`/`--frame-radius` (poster
+  border; 0px removes it), `--headline-width` (billboard sizing, height-capped so the start
+  screen never scrolls), `--display-weight`/`--display-stretch` (display type; stretch is
+  inert for Fraunces — no wdth axis).
+- Display font: Fraunces (variable wght 100–900 + opsz 9–144 via `next/font`; opsz auto-serves
+  the display cut for the headline and the text cut for body copy), exposed as the semantic
+  `--font-display` hook — swap fonts in `layout.tsx` only. Headline is per-line SVG
+  `textLength` justification in `StartScreen`; its `LINES` metrics are measured against
+  Fraunces' cap-ink heights, so retune them if the font or weight changes.
+- Gotcha: `@theme inline` tokens (e.g. `--font-sans`) are not real CSS custom properties —
+  plain CSS must reference `--font-display` directly, or the browser silently falls back to
+  the system font.

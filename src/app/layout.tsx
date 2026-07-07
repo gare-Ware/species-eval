@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Geist_Mono } from "next/font/google";
+import { Fraunces, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-// Variable font with weight + width + optical-size axes: one file covers the fat
-// poster headline (800) and body text, and leaves wdth free for motion play.
-const bricolage = Bricolage_Grotesque({
-  variable: "--font-bricolage",
+// Display + body face. Fraunces is a variable editorial serif: the opsz axis
+// (9–144) means the browser auto-serves the high-contrast display cut for the
+// giant headline and the sturdier text cut for body copy from the same file;
+// wght 100–900 stays open for axis motion. (SOFT/WONK axes exist but aren't
+// loaded — add them here to play with Fraunces' wonky display forms.) To
+// audition a different face, swap the import + constructor here — everything
+// else reads the semantic --font-display hook.
+const displayFont = Fraunces({
+  variable: "--font-display",
   subsets: ["latin"],
-  axes: ["opsz", "wdth"],
+  axes: ["opsz"],
 });
 
 const geistMono = Geist_Mono({
@@ -29,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${bricolage.variable} ${geistMono.variable} antialiased`}
+        className={`${displayFont.variable} ${geistMono.variable} antialiased`}
       >
         {children}
       </body>

@@ -2,6 +2,16 @@
 // (see globals.css) — cheap, and exempt from the React render cycle entirely.
 // Positions are generated from a seeded PRNG at module scope so the server and
 // client render identical markup (no hydration mismatch, no useEffect dance).
+//
+// Tunables (the flat-2D "parallax" is the size→drift coupling: bigger stars
+// read as nearer, so they travel farther):
+const STAR_COUNT = 700;
+const SIZE_BASE = 1; // px — smallest star
+const SIZE_RANGE = 2.4; // px — added via rand², so most stars stay fine
+const DRIFT_BASE = 14; // px — how far the smallest stars float
+const DRIFT_PER_PX = 16; // px of extra travel per px of star size
+const DRIFT_SECONDS: [number, number] = [7, 16]; // one leg of the float
+const TWINKLE_SECONDS: [number, number] = [2.5, 6.5];
 
 function mulberry32(seed: number) {
   return () => {
@@ -15,15 +25,22 @@ function mulberry32(seed: number) {
 
 const rand = mulberry32(2026);
 
-const STARS = Array.from({ length: 40 }, () => ({
-  left: `${(rand() * 100).toFixed(2)}%`,
-  top: `${(rand() * 100).toFixed(2)}%`,
-  size: 1 + rand() * 1.8,
-  opacity: 0.12 + rand() * 0.45,
-  twinkle: `${(3 + rand() * 4).toFixed(2)}s`,
-  drift: `${(10 + rand() * 14).toFixed(2)}s`,
-  delay: `${(-rand() * 10).toFixed(2)}s`,
-}));
+const STARS = Array.from({ length: STAR_COUNT }, () => {
+  const size = SIZE_BASE + rand() * rand() * SIZE_RANGE;
+  const driftDistance = DRIFT_BASE + size * DRIFT_PER_PX;
+  const driftAngle = rand() * Math.PI * 2;
+  return {
+    left: `${(rand() * 100).toFixed(2)}%`,
+    top: `${(rand() * 100).toFixed(2)}%`,
+    size,
+    opacity: 0.14 + rand() * 0.5,
+    twinkle: `${(TWINKLE_SECONDS[0] + rand() * (TWINKLE_SECONDS[1] - TWINKLE_SECONDS[0])).toFixed(2)}s`,
+    drift: `${(DRIFT_SECONDS[0] + rand() * (DRIFT_SECONDS[1] - DRIFT_SECONDS[0])).toFixed(2)}s`,
+    delay: `${(-rand() * 12).toFixed(2)}s`,
+    dx: `${(Math.cos(driftAngle) * driftDistance).toFixed(1)}px`,
+    dy: `${(Math.sin(driftAngle) * driftDistance).toFixed(1)}px`,
+  };
+});
 
 export function Starscape() {
   return (
@@ -41,6 +58,8 @@ export function Starscape() {
             '--twinkle': star.twinkle,
             '--drift': star.drift,
             '--delay': star.delay,
+            '--dx': star.dx,
+            '--dy': star.dy,
           } as React.CSSProperties}
         />
       ))}

@@ -100,9 +100,6 @@ export const GLYPH_POP: Transition = slow({ ...POP_SPRING, delay: 0.18 });
 export const REVEAL_CASCADE: Transition = stagger(EXIT_SECONDS + 0.18 + 0.15, 0.11);
 
 // ─── Ambient ─────────────────────────────────────────────────────────────────
-// The blob's idle breathing loop (an inner layer in Blob, so the infinite loop
-// never fights the step-driven size/position springs).
-export const BREATHE = {
-  animate: { scale: [1, 1.045, 1] },
-  transition: slow({ duration: 2.4, ease: 'easeInOut', repeat: Infinity }),
-};
+// The blob's idle life (breathing pulse, surface waves, weight + velocity
+// physics) lives in lib/blob.ts — it runs on its own rAF loop off the React
+// render cycle, so it never fights the step-driven size/position springs.

@@ -14,28 +14,57 @@
   --accent: var(--base-foreground);
 
   /* Shared design constants, referenced from components so each is tunable here. */
-  --display-stretch: 92%; /* poster/display type width squeeze (headline SVG + result name) */
-  --theme-fade: 700ms; /* species theme-takeover color cross-fade (blob fill + stars) */
+  --display-stretch: 100%; /* display type width — inert for Fraunces (no wdth axis); kept for wdth-axis fonts */
+  --display-weight: 900; /* headline SVG + result name weight */
+  --theme-fade: 700ms; /* species theme-takeover color cross-fade (blob + stars + frame) */
+
+  /* Billboard headline budget (StartScreen). Width-driven, but the dvh term
+     caps it so the whole start screen fits without scrolling: the headline
+     stack is ~0.65× its width tall, so width ≈ spare height × 1.55, where
+     23rem ≈ blob + gaps + hint + page padding + frame. Tune the three terms
+     independently: vw = how far it bleeds, rem = desktop ceiling, dvh = fit. */
+  --headline-width: min(88vw, 56rem, calc((100dvh - 23rem) * 1.55));
+
+  /* Viewport frame (Frame.tsx) — the poster border around the whole app.
+     Colored by --accent so the species takeover recolors it with the blob.
+     Set --frame-width to 0px (or drop <Frame/> from Quiz) to remove it. */
+  --frame-width: clamp(10px, 1.4vw, 16px);
+  --frame-radius: 20px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
-  --font-sans: var(--font-bricolage);
+  --font-sans: var(--font-display);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  /* Dark cosmic backdrop: a faint glow above a near-black field. */
-  background:
-    radial-gradient(120% 80% at 50% -10%, #171b28 0%, transparent 55%),
-    var(--background);
+  /* Flat 2D field — deliberately no gradient. (To restore the old cosmic glow,
+     layer a radial-gradient above var(--background) here.) */
+  background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  /* --font-display, not --font-sans: @theme inline never emits --font-sans as a
+     real custom property (it only inlines it into utilities), so referencing it
+     here silently fell back to the preflight system stack. */
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
 }
 
-/* Starscape. Stars use --foreground so the species takeover tints the sky too. */
+/* Viewport frame: a fixed rounded window whose giant spread shadow floods
+   everything outside it with the accent color — outer corners stay filled,
+   inner corners stay rounded, and the color cross-fades on theme takeover. */
+.frame {
+  position: fixed;
+  inset: var(--frame-width);
+  border-radius: var(--frame-radius);
+  box-shadow: 0 0 0 100vmax var(--accent);
+  transition: box-shadow var(--theme-fade);
+}
+
+/* Starscape. Stars use --foreground so the species takeover tints the sky too.
+   Each star floats along its own --dx/--dy vector (set in Starscape.tsx, where
+   distance scales with star size for a flat 2D parallax read) and twinkles. */
 .star {
   position: absolute;
   border-radius: 9999px;
@@ -43,7 +72,7 @@ body {
   transition: background-color var(--theme-fade);
   animation:
     star-twinkle var(--twinkle, 4s) ease-in-out var(--delay, 0s) infinite,
-    star-drift var(--drift, 14s) ease-in-out var(--delay, 0s) infinite alternate;
+    star-drift var(--drift, 12s) ease-in-out var(--delay, 0s) infinite alternate;
 }
 
 @keyframes star-twinkle {
@@ -61,7 +90,7 @@ body {
     translate: 0 0;
   }
   to {
-    translate: 0 -12px;
+    translate: var(--dx, 0px) var(--dy, -24px);
   }
 }
 
