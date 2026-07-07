@@ -4,8 +4,18 @@ import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { Species } from '@/data/species';
 import type { Step } from '@/lib/flow';
-import { EXIT, GLIDE, GLYPH_POP, POP, PRESS_HERO, REDUCED_FADE } from '@/lib/motion';
-import { BLOB, blobPath } from '@/lib/blob';
+import {
+  EXIT,
+  GLIDE,
+  GLYPH_POP,
+  GULP,
+  GULP_KEYFRAMES,
+  GULP_SIZE,
+  POP,
+  PRESS_HERO,
+  REDUCED_FADE,
+} from '@/lib/motion';
+import { BLOB, blobPath, pulseSwell } from '@/lib/blob';
 import { SLOWMO } from '@/lib/slowmo';
 import { SpeciesGlyph } from './SpeciesGlyph';
 
@@ -24,11 +34,14 @@ const SIZE: Record<Step, number> = { start: 152, quiz: 64, thinking: 120, result
 // The wobbling perimeter needs room beyond the nominal circle: the SVG box is
 // 150% of the button, and the viewBox reserves the same 1.5× in unit space.
 // Worst case from lib/blob.ts: 1 + waves + breathe + sag + maxDrag + maxLag
-// ≈ 1.24 — blob.test.ts pins the shape inside this box.
+// + pulse ≈ 1.31 — blob.test.ts pins the shape inside this box. (The gulp
+// scales the whole button, SVG included, so it can't push the shape out.)
 const OVERDRAW = 1.5;
 
 // SSR/initial shape (t=0, at rest) — the frame loop takes over on mount.
 const REST_PATH = blobPath(0);
+
+const within = ([min, max]: readonly [number, number]) => min + Math.random() * (max - min);
 
 export function Blob({ step, species, onBegin }: BlobProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -36,6 +49,18 @@ export function Blob({ step, species, onBegin }: BlobProps) {
   const alive = BLOB.alive && !prefersReducedMotion;
   const buttonRef = useRef<HTMLButtonElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
+
+  // Mirrors for the frame loop (it mounts once and must read current state):
+  // the surprise pulse only fires on the idle start screen, never while the
+  // pointer is engaged — hover/press feedback must stay the loudest scale cue.
+  const stepRef = useRef(step);
+  const engagedRef = useRef(false);
+  useEffect(() => {
+    stepRef.current = step;
+    // The button disables off the start screen, so a hover that rides into
+    // `begin` never gets its onHoverEnd — clear the flag on every step change.
+    engagedRef.current = false;
+  }, [step]);
 
   // The life loop: advance the surface waves and read the button's real
   // on-screen center each frame — Motion's springs move it, we just measure —
@@ -56,6 +81,10 @@ export function Blob({ step, species, onBegin }: BlobProps) {
     let jx = 0; // the tracker's own rate of change
     let jy = 0;
     let t = Math.random() * 100; // desync the waves across mounts
+    // Surprise-pulse schedule (t-space, so it stretches with slow-mo). The
+    // engine's pulseSwell is pure; the randomness lives only here.
+    let pulseAt = -Infinity;
+    let nextPulseAt = t + within(BLOB.pulse.firstGap);
 
     const tick = (now: number) => {
       const rect = el.getBoundingClientRect();
@@ -86,6 +115,20 @@ export function Blob({ step, species, onBegin }: BlobProps) {
           sy += jy * h;
         }
         const speed = Math.hypot(sx, sy);
+
+        // Fire a pulse when its window opens and the ball is idle on the start
+        // screen; otherwise push the window back and try again later. A ring
+        // in flight just keeps ringing across a step change — it's spent in
+        // under a second and the continuity reads better than a cut.
+        if (t >= nextPulseAt) {
+          if (stepRef.current === 'start' && !engagedRef.current) {
+            pulseAt = t;
+            nextPulseAt = t + within(BLOB.pulse.gap);
+          } else {
+            nextPulseAt = t + within(BLOB.pulse.firstGap);
+          }
+        }
+
         // dir needs no low-speed gate: soften() in lib/blob.ts scales the
         // deform smoothly to zero, so where the direction gets noisy (the
         // tracker ringing through zero at settle) it has no amplitude to show.
@@ -95,6 +138,7 @@ export function Blob({ step, species, onBegin }: BlobProps) {
             lag: speed * BLOB.lag,
             drag: speed * BLOB.drag,
             dir: Math.atan2(sy, sx),
+            swell: pulseSwell(t - pulseAt),
           }),
         );
       }
@@ -107,6 +151,13 @@ export function Blob({ step, species, onBegin }: BlobProps) {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [alive]);
+
+  // The thinking-beat gulp: squash-and-stretch keyframes on the scale channels,
+  // with the enlargement itself held back on GULP_SIZE so the sequence stages
+  // as travel → squash → swell (timeline rationale in motion.ts). Off the
+  // thinking step the channels pin back to 1, so an interrupted gulp can never
+  // strand the ball squashed.
+  const gulping = step === 'thinking' && !prefersReducedMotion;
 
   return (
     <motion.button
@@ -121,16 +172,26 @@ export function Blob({ step, species, onBegin }: BlobProps) {
       aria-hidden={!interactive}
       disabled={!interactive}
       onClick={interactive ? onBegin : undefined}
-      animate={{ width: SIZE[step], height: SIZE[step] }}
+      animate={{
+        width: SIZE[step],
+        height: SIZE[step],
+        ...(gulping ? GULP_KEYFRAMES : { scaleX: 1, scaleY: 1 }),
+      }}
       // Size: the result rides POP (the reveal bounce); everything else the calm
       // GLIDE. Position: pinned to the shared GLIDE so blob and chrome travel on
       // one spring.
       transition={{
         ...(step === 'result' ? POP : GLIDE),
         layout: GLIDE,
+        ...(gulping ? { scaleX: GULP, scaleY: GULP, width: GULP_SIZE, height: GULP_SIZE } : {}),
       }}
       whileHover={interactive && !prefersReducedMotion ? PRESS_HERO.whileHover : undefined}
       whileTap={interactive && !prefersReducedMotion ? PRESS_HERO.whileTap : undefined}
+      // Engagement flags for the surprise pulse (see the stepRef effect above).
+      onHoverStart={() => (engagedRef.current = true)}
+      onHoverEnd={() => (engagedRef.current = false)}
+      onTapStart={() => (engagedRef.current = true)}
+      onTapCancel={() => (engagedRef.current = false)}
       className={`relative shrink-0 rounded-full @container-size enabled:cursor-pointer ${
         alive ? '' : 'bg-accent transition-colors duration-(--theme-fade)'
       }`}

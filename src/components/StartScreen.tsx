@@ -4,7 +4,7 @@ import { forwardRef } from 'react';
 import type { Ref } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { Variants } from 'motion/react';
-import { FADE, fadeSlide, stagger } from '@/lib/motion';
+import { displayWeight, EXIT, FADE, fadeSlide, GLIDE, INK, INK_FROM, OFFSET, stagger } from '@/lib/motion';
 
 interface StartScreenProps {
   headingRef?: Ref<HTMLHeadingElement>;
@@ -31,7 +31,8 @@ const LINES = [
 const STAGGER = 0;
 
 // The stack settles down in from just above and drifts back up out — a short
-// offset + fade on the shared GLIDE, so header and blob travel together.
+// offset + fade on the shared GLIDE, so header and blob travel together. The
+// eyebrow rides this as-is; the headline lines add a weight channel below.
 const line: Variants = fadeSlide('above');
 
 const container: Variants = {
@@ -56,6 +57,28 @@ export const StartScreen = forwardRef<HTMLElement, StartScreenProps>(function St
   const prefersReducedMotion = useReducedMotion();
   const lineVariants = prefersReducedMotion ? FADE : line;
   const containerVariants = prefersReducedMotion ? quietContainer : container;
+
+  // Headline lines: the fadeSlide('above') shape with one extra channel —
+  // variable weight. Each line enters at INK_FROM and inks in to the resting
+  // display weight on its own spring (INK, see motion.ts), landing just after
+  // the position settles; textLength re-justifies every frame, so the lighter
+  // start doubles as the line visibly tightening into the measure. Weight is
+  // transient — the LINES metrics above apply at rest, where every entrance
+  // ends. Built per-render because displayWeight() reads the CSS token in the
+  // browser. The <text> inherits font-weight from the wrapper; the wrapper's
+  // base style pins the resting weight for the reduced-motion path.
+  const inkedLine: Variants = prefersReducedMotion
+    ? FADE
+    : {
+        hidden: { opacity: 0, y: -OFFSET, fontWeight: INK_FROM },
+        show: {
+          opacity: 1,
+          y: 0,
+          fontWeight: displayWeight(),
+          transition: { ...GLIDE, fontWeight: INK },
+        },
+        exit: { opacity: 0, y: -OFFSET, transition: EXIT },
+      };
 
   return (
     <motion.header
@@ -82,7 +105,11 @@ export const StartScreen = forwardRef<HTMLElement, StartScreenProps>(function St
         An alien species evaluation
       </motion.p>
       {LINES.map(({ text, fontSize, height, baseline }) => (
-        <motion.div key={text} variants={lineVariants}>
+        <motion.div
+          key={text}
+          variants={inkedLine}
+          style={{ fontWeight: 'var(--display-weight)' }}
+        >
           <svg
             viewBox={`0 0 1000 ${height}`}
             className="block w-full"
@@ -95,7 +122,7 @@ export const StartScreen = forwardRef<HTMLElement, StartScreenProps>(function St
               lengthAdjust="spacingAndGlyphs"
               fontSize={fontSize}
               className="fill-foreground font-sans"
-              style={{ fontStretch: 'var(--display-stretch)', fontWeight: 'var(--display-weight)' }}
+              style={{ fontStretch: 'var(--display-stretch)' }}
             >
               {text}
             </text>

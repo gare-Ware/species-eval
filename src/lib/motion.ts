@@ -6,8 +6,9 @@ import { slow, slowMs } from './slowmo';
 // affordances, enter/exit variants, and cross-component choreography beats.
 // Components use these tokens; raw { stiffness, damping } literals live only here.
 //
-// Personality: "premium with a little life" — calm, decisive springs, with one
-// springy overshoot (POP) reserved for the result reveal.
+// Personality: "premium with a little life" — calm, decisive springs, with
+// overshoot rationed by moment: a small bounce where the blob swallows
+// (GULP_SIZE), the big one (POP) reserved for the result reveal.
 //
 // Every token is pre-scaled through slow()/slowMs() at import, so the dev
 // slow-mo toggle (slowmo.ts) stretches the whole app without components
@@ -43,12 +44,57 @@ export const FADE: Variants = {
 // ─── Interaction ─────────────────────────────────────────────────────────────
 // One hover/tap language for every pressable, by button shape:
 //   PRESS      — compact controls (the retake pill)
-//   PRESS_HERO — the blob: the primary invitation, so a touch more
+//   PRESS_HERO — the blob: the primary invitation, so a touch more. Sized to
+//                outrank the blob's ambient surprise pulse (BLOB.pulse peaks
+//                ~+4.5%): pointer feedback must stay the loudest scale cue.
 //   PRESS_ROW  — full-width rows: scaling a wide element reads as jumpy, so
 //                hover stays a CSS color shift and only the tap dips
 export const PRESS = { whileHover: { scale: 1.03 }, whileTap: { scale: 0.97 } } as const;
-export const PRESS_HERO = { whileHover: { scale: 1.06 }, whileTap: { scale: 0.94 } } as const;
+export const PRESS_HERO = { whileHover: { scale: 1.08 }, whileTap: { scale: 0.94 } } as const;
 export const PRESS_ROW = { whileTap: { scale: 0.99 } } as const;
+
+// Thinking-beat gulp: the blob "swallows" the answer as it enlarges into the
+// thinking size. A fast vertical squash (anticipation) releases into the size
+// spring plus a stretch overshoot (follow-through). Keyframes, not a spring:
+// squash → stretch → settle needs three stations inside ~¼s. Axis-asymmetric
+// on purpose — a gulp is vertical — but transient, so it reads as character,
+// not goo (the shape engine deliberately never holds an oval).
+//
+// STAGING (measured, not guessed): the step change also sends the ball on a
+// ~250px layout glide as the answered card leaves, and that glide is ~97%
+// settled ~190ms in. Playing the gulp at the step change renders fine but
+// reads as nothing — travel + 88% growth drown a ±10% scale wiggle. So the
+// gulp waits out the travel (GULP_DELAY), squashes on the landing ball, and
+// only then does the enlargement spring off (GULP_SIZE), timed so growth and
+// stretch release together. One voice at a time: travel → squash → swell.
+//
+// GULP_DELAY is tuned so the squash BOTTOMS right at touchdown (delay + 80ms
+// ≈ the glide's ~190ms settle): the ball visibly compresses into its landing,
+// then springs up to size — raise it and the ball instead sits idle for a
+// beat before gulping.
+export const GULP_DELAY = 0.12;
+export const GULP_KEYFRAMES: { scaleX: number[]; scaleY: number[] } = {
+  scaleX: [1, 1.07, 0.97, 1],
+  scaleY: [1, 0.87, 1.06, 1],
+};
+export const GULP: Transition = slow({
+  delay: GULP_DELAY,
+  duration: 0.26,
+  times: [0, 0.3, 0.65, 1],
+  ease: ['easeOut', 'easeInOut', 'easeOut'],
+});
+// The thinking-size enlargement, held back until the squash bottoms out
+// (GULP's first station lands at delay + 0.3 × duration ≈ delay + 80ms).
+// Deliberately underdamped: the ball springs up to size and lands with one
+// small life-like bounce (~12% overshoot ≈ 7px at thinking size). POP's
+// little sibling — same stiffness family, more damping, so the result reveal
+// keeps the biggest bounce in the app.
+export const GULP_SIZE: Transition = slow({
+  type: 'spring',
+  stiffness: 380,
+  damping: 22,
+  delay: GULP_DELAY + 0.08,
+});
 
 // Answer-confirm targets: the chosen row pops up a touch and holds, the rest
 // dim. The chosen row's color inversion is CSS (see QuestionCard).
@@ -77,6 +123,30 @@ export function stagger(delayChildren: number, staggerChildren: number, staggerD
     staggerChildren,
     ...(staggerDirection ? { staggerDirection } : {}),
   });
+}
+
+// ─── Type voice ──────────────────────────────────────────────────────────────
+// Variable-weight entrance for the display face (Fraunces' wght axis): display
+// type starts at INK_FROM and "inks in" to the resting --display-weight as it
+// lands. INK settles just after the position spring — that late channel is the
+// follow-through that reads as elasticity. On the SVG headline, textLength
+// re-justifies every frame, so the lighter start also reads as the line
+// tightening into the measure. Damping keeps overshoot under a weight unit:
+// the axis clamps at 900, and a real overshoot would flat-line there mid-ring.
+// Content voice only — never animate the mono label weight.
+export const INK_FROM = 560;
+export const INK: Transition = slow({ type: 'spring', stiffness: 120, damping: 20 });
+
+// Resting display weight, read from the --display-weight token so the CSS knob
+// stays the single source of truth. SSR/first paint falls back to the authored
+// default (keep in sync with globals.css).
+let displayWeightCache: number | undefined;
+export function displayWeight(): number {
+  if (typeof window === 'undefined') return 900;
+  displayWeightCache ??=
+    parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--display-weight')) ||
+    900;
+  return displayWeightCache;
 }
 
 // ─── Choreography beats ──────────────────────────────────────────────────────

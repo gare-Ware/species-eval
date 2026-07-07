@@ -6,6 +6,7 @@
 //   waves    — fast, shallow shimmer around the perimeter (energy = high
 //              frequency / low amplitude; goo = slow and deep — tune that way)
 //   breathe  — the whole-ball pulse (the dominant idle read)
+//   pulse    — a rare springy swell on the start screen (surprise, not rhythm)
 //   sag      — a light resting bottom bulge, so the ball still has weight
 //   velocity — the ball moves FROM ITS CENTER: the shell shifts a touch behind
 //              the true center (lag) and a focused wake trails it (tail). The
@@ -49,6 +50,23 @@ export const BLOB = {
   /** Whole-ball pulse: radius swings ±amp over period seconds — the idle heartbeat. */
   breathe: { amp: 0.032, period: 2.8 },
 
+  /**
+   * Surprise pulse: a springy whole-ball swell fired at random intervals on the
+   * start screen (scheduling lives in Blob.tsx so this module stays
+   * deterministic). Envelope: exponentially damped sine — the first crest
+   * reaches ~⅔ of amp, rings once below rest, and is spent within a second.
+   * Rare on purpose (Comeau: rare = surprise, frequent = needy), and its peak
+   * (~+4.5% radius) sits deliberately under the hover lift (PRESS_HERO +8%),
+   * so pointer feedback always outranks ambient whimsy.
+   */
+  pulse: {
+    amp: 0.07, // envelope scale — first visible crest ≈ 0.66 × amp
+    omega: 14, // ring frequency (rad/s) — higher = springier
+    decay: 4, // envelope die-off (1/s) — higher = spent sooner
+    gap: [7, 13] as [number, number], // seconds between pulses (uniform random)
+    firstGap: [3, 6] as [number, number], // sooner, so short visits still see one
+  },
+
   /** Resting weight: a light bottom bulge so the sphere still sits in gravity. */
   sag: 0.03,
 
@@ -82,7 +100,7 @@ export const BLOB = {
 
 export type BlobConfig = typeof BLOB;
 
-/** Velocity-derived deformation for one frame (already smoothed by the caller). */
+/** Per-frame dynamic deformation (velocity terms already smoothed by the caller). */
 export interface BlobDeform {
   /** Shell offset behind the center along `dir`, soft-capped by maxLag. */
   lag: number;
@@ -90,9 +108,23 @@ export interface BlobDeform {
   drag: number;
   /** Direction of travel in radians (SVG space: +y is down). */
   dir: number;
+  /** Uniform transient radius kick — the surprise pulse (see pulseSwell). 0/absent at rest. */
+  swell?: number;
 }
 
 export const BLOB_AT_REST: BlobDeform = { lag: 0, drag: 0, dir: 0 };
+
+/**
+ * Springy radius kick `elapsed` seconds after a pulse fires — feed the result
+ * into BlobDeform.swell. Damped sine: swell up, one visible dip below rest,
+ * done. Pure and deterministic; when the ring has decayed to nothing it is
+ * exactly 0, so a stale pulse costs nothing at rest.
+ */
+export function pulseSwell(elapsed: number, cfg: BlobConfig = BLOB): number {
+  const { amp, omega, decay } = cfg.pulse;
+  if (elapsed < 0 || elapsed * decay > 8) return 0; // not fired / fully rung down
+  return amp * Math.exp(-decay * elapsed) * Math.sin(omega * elapsed);
+}
 
 /**
  * Soft saturation for the velocity deforms: identity slope at 0 (so lag/drag
@@ -115,7 +147,7 @@ export function blobPoints(t: number, deform: BlobDeform, cfg: BlobConfig = BLOB
   const pts: [number, number][] = [];
   for (let i = 0; i < cfg.points; i++) {
     const theta = (i / cfg.points) * 2 * Math.PI;
-    let r = 1 + breathe;
+    let r = 1 + breathe + (deform.swell ?? 0);
     for (const w of cfg.waves) r += w.amp * Math.sin(w.lobes * theta + w.speed * t + w.phase);
 
     // Gravity: bulge concentrated at the bottom (+y in SVG space), with a

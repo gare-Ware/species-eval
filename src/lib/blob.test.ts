@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { BLOB, BLOB_AT_REST, blobPath, blobPoints, soften } from './blob';
+import { BLOB, BLOB_AT_REST, blobPath, blobPoints, pulseSwell, soften } from './blob';
 
 // The Blob SVG reserves 1.5× the nominal radius (OVERDRAW in Blob.tsx); the
 // shape must stay inside that no matter what velocity the frame loop feeds in.
 const OVERDRAW = 1.5;
 
-const HARD_DEFORM = { lag: 99, drag: 99, dir: Math.PI / 3 };
+const HARD_DEFORM = { lag: 99, drag: 99, dir: Math.PI / 3, swell: BLOB.pulse.amp };
 
 describe('blobPoints', () => {
   it('samples the configured number of perimeter points', () => {
@@ -26,6 +26,32 @@ describe('blobPoints', () => {
     for (const [x, y] of blobPoints(3.2, HARD_DEFORM)) {
       expect(Math.hypot(x, y)).toBeLessThan(OVERDRAW);
     }
+  });
+});
+
+describe('pulseSwell', () => {
+  it('is silent before the pulse and after the ring has decayed', () => {
+    expect(pulseSwell(-1)).toBe(0);
+    expect(pulseSwell(1e9)).toBe(0); // stale pulse costs exactly nothing at rest
+  });
+
+  it('swells positive first and stays under the configured amp', () => {
+    const first = pulseSwell(Math.PI / 2 / BLOB.pulse.omega); // first crest region
+    expect(first).toBeGreaterThan(0);
+    for (let e = 0; e < 3; e += 0.01) {
+      expect(Math.abs(pulseSwell(e))).toBeLessThanOrEqual(BLOB.pulse.amp);
+    }
+  });
+
+  it('rings: dips below rest after the first crest (the springy read)', () => {
+    const dip = pulseSwell((3 * Math.PI) / 2 / BLOB.pulse.omega);
+    expect(dip).toBeLessThan(0);
+  });
+
+  it('decays away smoothly instead of cutting off (no visible pop at the tail)', () => {
+    // Just inside the early-out boundary the ring must already be negligible.
+    const boundary = 8 / BLOB.pulse.decay;
+    expect(Math.abs(pulseSwell(boundary - 1e-3))).toBeLessThan(BLOB.pulse.amp / 100);
   });
 });
 

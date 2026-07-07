@@ -5,7 +5,17 @@ import type { Ref } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { Variants } from 'motion/react';
 import type { Species } from '@/data/species';
-import { EXIT, OFFSET, PRESS, REDUCED_FADE, REVEAL_CASCADE, SETTLE } from '@/lib/motion';
+import {
+  displayWeight,
+  EXIT,
+  INK,
+  INK_FROM,
+  OFFSET,
+  PRESS,
+  REDUCED_FADE,
+  REVEAL_CASCADE,
+  SETTLE,
+} from '@/lib/motion';
 import { InlineMarkdown } from './InlineMarkdown';
 
 interface ResultCardProps {
@@ -56,6 +66,23 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
   const containerVariants = prefersReducedMotion ? reducedContainer : container;
   const itemVariants = prefersReducedMotion ? reducedItem : item;
 
+  // The name is the payoff word: it rides its cascade slot like the other
+  // items but adds the display face's weight channel, inking in from INK_FROM
+  // as it lands (see motion.ts). Built per-render because displayWeight()
+  // reads the CSS token in the browser; the h1's base style keeps the resting
+  // weight for the reduced-motion path.
+  const nameVariants: Variants = prefersReducedMotion
+    ? reducedItem
+    : {
+        hidden: { opacity: 0, y: 18, fontWeight: INK_FROM },
+        show: {
+          opacity: 1,
+          y: 0,
+          fontWeight: displayWeight(),
+          transition: { ...SETTLE, fontWeight: INK },
+        },
+      };
+
   return (
     <motion.section
       ref={ref}
@@ -77,7 +104,7 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
           id="result-title"
           ref={headingRef}
           tabIndex={-1}
-          variants={itemVariants}
+          variants={nameVariants}
           className="text-5xl uppercase text-accent focus:outline-none sm:text-6xl"
           style={{ fontStretch: 'var(--display-stretch)', fontWeight: 'var(--display-weight)' }}
         >
