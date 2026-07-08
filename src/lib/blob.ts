@@ -176,7 +176,11 @@ export const BLOB = {
    *   period   — seconds per swell cycle. Quiz reveals only on a boundary
    *              (see motion.ts CHARGE_CYCLE_MS), so keep them in sync via
    *              this one number.
-   *   ramp     — seconds from touchdown to full storm
+   *   ramp     — seconds from the beat's step change to full storm. The ramp
+   *              runs THROUGH the descent — agitation and flare violence build
+   *              in flight, so the ball lands already storming and the first
+   *              thump hits at touchdown (the swell/thump cycles themselves
+   *              still start at touchdown, keeping the boundary grid intact)
    *   swell    — whole-ball breathing amplitude per cycle (sin² hump: silent
    *              and flat at both ends, so any boundary is a clean cut)
    *   pulse    — the thump: a springy pulseSwell ring fired at every cycle
@@ -192,7 +196,7 @@ export const BLOB = {
    *   flareAmp — flare amplitude multiplier at full charge
    *   flareGap — extra spawn-gap cut at full charge (× (1 − this))
    */
-  charge: { period: 1.1, ramp: 0.9, swell: 0.055, pulse: 1.3, agitation: 1, flareAmp: 1.9, flareGap: 0.55 },
+  charge: { period: 1.1, ramp: 0.55, swell: 0.055, pulse: 3, agitation: 1, flareAmp: 3, flareGap: 0.55 },
 
   /** Travel streak: extra trailing-hemisphere shimmer, ∝ normalized wake. */
   streak: 0.8,

@@ -180,7 +180,10 @@ export function Blob({ step, species, charging = false, onBegin }: BlobProps) {
         if (chargingRef.current) {
           chargeStart ??= t + BURST_DELAY;
           const into = t - chargeStart;
-          chargeLevel = Math.min(1, Math.max(0, into / BLOB.charge.ramp));
+          // The ramp counts from the step change (into + BURST_DELAY), not
+          // touchdown — the violence builds through the descent so the ball
+          // lands already storming and the first thump hits on arrival.
+          chargeLevel = Math.min(1, Math.max(0, (into + BURST_DELAY) / BLOB.charge.ramp));
           if (into > 0) {
             // Each cycle: a springy THUMP at the start (pulseSwell, spent well
             // before the boundary) into the sin² swell mid-cycle.

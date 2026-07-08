@@ -8,24 +8,42 @@ const OVERDRAW = 2;
 // First crest of the flare envelope — the peak of the escape attempt.
 const FLARE_CREST = Math.PI / 2 / BLOB.flare.omega;
 
-// Everything at once, stacked adversarially: extreme velocity, the pulse at
-// max, full churn, and three flares piled on one direction at the biggest
-// amplitude the charge storm can spawn (the soft cap is what keeps that
-// survivable). pulse.amp also covers the charge swell: the storm's thump and
-// hump crests are temporally separated, so their combined peak stays under it
-// (see BLOB.charge.pulse).
+// Charged flares: the biggest amplitude the storm can spawn.
+const STORM_FLARES = [0, 1, 2].map(() => ({
+  dir: Math.PI / 3,
+  width: BLOB.flare.width[1],
+  amp: BLOB.flare.amp[1] * BLOB.charge.flareAmp,
+  elapsed: FLARE_CREST,
+}));
+
+// Travel stack, adversarial: extreme velocity, the idle pulse at max (a ring
+// can ride across a step change into a glide), full churn, and three charged
+// flares piled on one direction — the ramp runs through the descent, so
+// charged flares DO coincide with travel. The charge swell doesn't: it's
+// gated to touchdown, where the velocity deforms have collapsed (see
+// CHARGE_DEFORM below for that context).
 const HARD_DEFORM = {
   lag: 99,
   drag: 99,
   dir: Math.PI / 3,
   swell: BLOB.pulse.amp,
   agitation: 1,
-  flares: [0, 1, 2].map(() => ({
-    dir: Math.PI / 3,
-    width: BLOB.flare.width[1],
-    amp: BLOB.flare.amp[1] * BLOB.charge.flareAmp,
-    elapsed: FLARE_CREST,
-  })),
+  flares: STORM_FLARES,
+};
+
+// Storm stack, adversarial: at rest (the charge plays out after touchdown),
+// with the whole-ball swell at the thump crest AND the full mid-cycle hump as
+// if coincident — in reality they're temporally separated, so this over-bounds.
+const STORM_SWELL =
+  BLOB.charge.swell +
+  Math.max(...Array.from({ length: 300 }, (_, i) => BLOB.charge.pulse * pulseSwell(i * 0.01)));
+const CHARGE_DEFORM = {
+  lag: 0,
+  drag: 0,
+  dir: 0,
+  swell: STORM_SWELL,
+  agitation: 1,
+  flares: STORM_FLARES,
 };
 
 describe('blobPoints', () => {
@@ -46,6 +64,14 @@ describe('blobPoints', () => {
   it('clamps extreme deformation inside the SVG overdraw box', () => {
     for (const t of [0, 1.1, 3.2, 7.9, 12.4, 33.3]) {
       for (const [x, y] of blobPoints(t, HARD_DEFORM)) {
+        expect(Math.hypot(x, y)).toBeLessThan(OVERDRAW);
+      }
+    }
+  });
+
+  it('clamps the full charge storm inside the overdraw box', () => {
+    for (const t of [0, 1.1, 3.2, 7.9, 12.4, 33.3]) {
+      for (const [x, y] of blobPoints(t, CHARGE_DEFORM)) {
         expect(Math.hypot(x, y)).toBeLessThan(OVERDRAW);
       }
     }
