@@ -179,13 +179,20 @@ export const BLOB = {
    *   ramp     — seconds from touchdown to full storm
    *   swell    — whole-ball breathing amplitude per cycle (sin² hump: silent
    *              and flat at both ends, so any boundary is a clean cut)
+   *   pulse    — the thump: a springy pulseSwell ring fired at every cycle
+   *              start, × the idle pulse's amp. Rung down well inside one
+   *              period (decay 4 → spent ~0.7s in), so boundaries stay
+   *              silent; the thump punches at the cycle start, the hump
+   *              swells mid-cycle — THUMP, swell, THUMP is the storm rhythm.
+   *              Their crests are temporally separated, so combined swell
+   *              never exceeds the idle pulse bound (~0.065 < pulse.amp).
    *   agitation— churn floor at full charge (shimmer + flare rate ride it;
    *              fed into the real accumulator so it decays naturally through
    *              the reveal pop instead of snapping off)
    *   flareAmp — flare amplitude multiplier at full charge
    *   flareGap — extra spawn-gap cut at full charge (× (1 − this))
    */
-  charge: { period: 1.1, ramp: 0.9, swell: 0.05, agitation: 0.85, flareAmp: 1.6, flareGap: 0.45 },
+  charge: { period: 1.1, ramp: 0.9, swell: 0.055, pulse: 1.3, agitation: 1, flareAmp: 1.9, flareGap: 0.55 },
 
   /** Travel streak: extra trailing-hemisphere shimmer, ∝ normalized wake. */
   streak: 0.8,

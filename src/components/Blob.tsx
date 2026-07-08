@@ -181,12 +181,17 @@ export function Blob({ step, species, charging = false, onBegin }: BlobProps) {
           chargeStart ??= t + BURST_DELAY;
           const into = t - chargeStart;
           chargeLevel = Math.min(1, Math.max(0, into / BLOB.charge.ramp));
-          chargeSwell =
-            into > 0
-              ? chargeLevel *
-                BLOB.charge.swell *
-                Math.sin(Math.PI * ((into / BLOB.charge.period) % 1)) ** 2
-              : 0;
+          if (into > 0) {
+            // Each cycle: a springy THUMP at the start (pulseSwell, spent well
+            // before the boundary) into the sin² swell mid-cycle.
+            chargeSwell =
+              chargeLevel *
+              (BLOB.charge.swell *
+                Math.sin(Math.PI * ((into / BLOB.charge.period) % 1)) ** 2 +
+                BLOB.charge.pulse * pulseSwell(into % BLOB.charge.period));
+          } else {
+            chargeSwell = 0;
+          }
           agitation = Math.max(agitation, chargeLevel * BLOB.charge.agitation);
         } else {
           chargeStart = undefined;

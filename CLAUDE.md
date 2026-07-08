@@ -53,8 +53,9 @@ AI-generated personalized result. Human-facing overview and setup live in `READM
   during travel; deceleration churn, also kicked by pointer engagement; a travel sag/regroup
   wake; a weight system — the base bulge pools on the exhale, and a calm-base gradient
   keeps the crown crackling over a still base; and a final-beat charge storm — held
-  agitation, bigger/faster flares, sin² swell cycles — whose cycle boundaries are the only
-  points Quiz will fire the reveal on, so the surge in flight always completes. Every
+  agitation, bigger/faster flares, sin² swell cycles opening with a springy thump — whose
+  cycle boundaries are the only points Quiz will fire the reveal on, so the surge in
+  flight always completes. Every
   tunable is in its `BLOB` config; `BLOB.alive = false` reverts to a plain circle) ·
   `slowmo` dev toggle
 - `src/components/` — `Quiz` orchestrator + `StartScreen`/`QuestionCard`/`ResultCard` +

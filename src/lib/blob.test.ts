@@ -11,7 +11,9 @@ const FLARE_CREST = Math.PI / 2 / BLOB.flare.omega;
 // Everything at once, stacked adversarially: extreme velocity, the pulse at
 // max, full churn, and three flares piled on one direction at the biggest
 // amplitude the charge storm can spawn (the soft cap is what keeps that
-// survivable).
+// survivable). pulse.amp also covers the charge swell: the storm's thump and
+// hump crests are temporally separated, so their combined peak stays under it
+// (see BLOB.charge.pulse).
 const HARD_DEFORM = {
   lag: 99,
   drag: 99,
