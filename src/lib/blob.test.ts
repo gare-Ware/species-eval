@@ -8,21 +8,42 @@ const OVERDRAW = 2;
 // First crest of the flare envelope — the peak of the escape attempt.
 const FLARE_CREST = Math.PI / 2 / BLOB.flare.omega;
 
-// Everything at once, stacked adversarially: extreme velocity, the pulse at
-// max, full churn, and three max-amp flares piled on one direction (the soft
-// cap is what keeps that survivable).
+// Charged flares: the biggest amplitude the storm can spawn.
+const STORM_FLARES = [0, 1, 2].map(() => ({
+  dir: Math.PI / 3,
+  width: BLOB.flare.width[1],
+  amp: BLOB.flare.amp[1] * BLOB.charge.flareAmp,
+  elapsed: FLARE_CREST,
+}));
+
+// Travel stack, adversarial: extreme velocity, the idle pulse at max (a ring
+// can ride across a step change into a glide), full churn, and three charged
+// flares piled on one direction — the ramp runs through the descent, so
+// charged flares DO coincide with travel. The charge swell doesn't: it's
+// gated to touchdown, where the velocity deforms have collapsed (see
+// CHARGE_DEFORM below for that context).
 const HARD_DEFORM = {
   lag: 99,
   drag: 99,
   dir: Math.PI / 3,
   swell: BLOB.pulse.amp,
   agitation: 1,
-  flares: [0, 1, 2].map(() => ({
-    dir: Math.PI / 3,
-    width: BLOB.flare.width[1],
-    amp: BLOB.flare.amp[1],
-    elapsed: FLARE_CREST,
-  })),
+  flares: STORM_FLARES,
+};
+
+// Storm stack, adversarial: at rest (the charge plays out after touchdown),
+// with the whole-ball swell at the thump crest AND the full mid-cycle hump as
+// if coincident — in reality they're temporally separated, so this over-bounds.
+const STORM_SWELL =
+  BLOB.charge.swell +
+  Math.max(...Array.from({ length: 300 }, (_, i) => BLOB.charge.pulse * pulseSwell(i * 0.01)));
+const CHARGE_DEFORM = {
+  lag: 0,
+  drag: 0,
+  dir: 0,
+  swell: STORM_SWELL,
+  agitation: 1,
+  flares: STORM_FLARES,
 };
 
 describe('blobPoints', () => {
@@ -43,6 +64,14 @@ describe('blobPoints', () => {
   it('clamps extreme deformation inside the SVG overdraw box', () => {
     for (const t of [0, 1.1, 3.2, 7.9, 12.4, 33.3]) {
       for (const [x, y] of blobPoints(t, HARD_DEFORM)) {
+        expect(Math.hypot(x, y)).toBeLessThan(OVERDRAW);
+      }
+    }
+  });
+
+  it('clamps the full charge storm inside the overdraw box', () => {
+    for (const t of [0, 1.1, 3.2, 7.9, 12.4, 33.3]) {
+      for (const [x, y] of blobPoints(t, CHARGE_DEFORM)) {
         expect(Math.hypot(x, y)).toBeLessThan(OVERDRAW);
       }
     }
@@ -81,6 +110,55 @@ describe('blobPoints', () => {
     const withFlare = at(blobPoints(2, { ...BLOB_AT_REST, flares: [flare] }));
     const without = at(blobPoints(2, BLOB_AT_REST));
     expect(withFlare).toBeGreaterThan(without);
+  });
+});
+
+describe('weight', () => {
+  // theta = (i / points) · 2π, +y down in SVG space: bottom = points/4.
+  const BOTTOM = BLOB.points / 4;
+  const TOP = (3 * BLOB.points) / 4;
+  const radiusAt = (pts: [number, number][], i: number) => Math.hypot(pts[i][0], pts[i][1]);
+
+  // Waves zeroed via cfg so the structural read isn't swamped by shimmer
+  // noise — the sag/breathe coupling is the system under test.
+  const STRUCTURE = { ...BLOB, waves: [] as typeof BLOB.waves };
+
+  it('rests heavier at the base through the whole breath', () => {
+    for (const frac of [0, 0.25, 0.5, 0.75]) {
+      const pts = blobPoints(frac * BLOB.breathe.period, BLOB_AT_REST, STRUCTURE);
+      expect(radiusAt(pts, BOTTOM)).toBeGreaterThan(radiusAt(pts, TOP));
+    }
+  });
+
+  it('pools on the exhale — the bulge deepens at the bottom of the breath', () => {
+    // 0.75 × period = deepest exhale, 0.25 = fullest inhale. The uniform
+    // breathe term cancels in the bottom−top difference; what remains is the
+    // mass visibly settling as the breath releases.
+    const bulge = (frac: number) => {
+      const pts = blobPoints(frac * BLOB.breathe.period, BLOB_AT_REST, STRUCTURE);
+      return radiusAt(pts, BOTTOM) - radiusAt(pts, TOP);
+    };
+    expect(bulge(0.75)).toBeGreaterThan(bulge(0.25));
+  });
+
+  it('keeps the base calm — the crown shimmers harder than the pooled mass', () => {
+    // Breathe and the sag coupling zeroed via cfg: the remaining radius
+    // variance over time is pure shimmer, which the calm gradient must damp
+    // at the base relative to the crown.
+    const SHIMMER = {
+      ...BLOB,
+      breathe: { ...BLOB.breathe, amp: 0 },
+      sag: { ...BLOB.sag, breathe: 0 },
+    };
+    const std = (index: number) => {
+      const samples: number[] = [];
+      for (let t = 0; t < 12; t += 0.05) {
+        samples.push(radiusAt(blobPoints(t, BLOB_AT_REST, SHIMMER), index));
+      }
+      const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+      return Math.sqrt(samples.reduce((a, b) => a + (b - mean) ** 2, 0) / samples.length);
+    };
+    expect(std(TOP)).toBeGreaterThan(1.5 * std(BOTTOM));
   });
 });
 

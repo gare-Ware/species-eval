@@ -5,16 +5,12 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { Species } from '@/data/species';
 import type { Step } from '@/lib/flow';
 import {
+  BURST,
+  BURST_DELAY,
+  BURST_KEYFRAMES,
   EXIT,
   GLIDE,
   GLYPH_POP,
-  GULP,
-  GULP_HOP,
-  GULP_HOP_KEYFRAMES,
-  GULP_KEYFRAMES,
-  GULP_RETURN_SIZE,
-  GULP_SIZE,
-  gulpReturnKeyframes,
   POP,
   PRESS_HERO,
   REDUCED_FADE,
@@ -27,26 +23,30 @@ interface BlobProps {
   step: Step;
   /** The winning species — only set during the result step. */
   species: Species | null;
-  /** Between questions, shrink at center before the next card pulls the blob up. */
-  returnToQuizSize?: boolean;
+  /**
+   * The final thinking beat: the narrative call is in flight and the reveal is
+   * next. The ball skips the between-question burst+hop and CHARGES instead —
+   * the storm in BLOB.charge — while Quiz holds the reveal for a swell-cycle
+   * boundary so the surge in progress always completes.
+   */
+  charging?: boolean;
   onBegin: () => void;
 }
 
 // The one persistent element: never unmounts, only changes size (animate) and
 // position (layout) — the continuity that makes the flow read as one scene.
 // 'thinking' is the enlarged between-question size; 'error' holds that same
-// size — the ball that was "thinking" for you, caught mid-thought.
-const SIZE: Record<Step, number> = { start: 152, quiz: 64, thinking: 120, result: 168, error: 120 };
-// Between-question return stations (swell → hold under the hop → shrink);
-// their times/eases live with GULP_RETURN_SIZE in motion.ts so the pairing is
-// a one-screen edit.
-const THINKING_RETURN_SIZE = gulpReturnKeyframes(SIZE.quiz, SIZE.thinking);
+// size — the ball that was "thinking" for you, caught mid-thought. quiz is
+// sized to the flare legibility floor: at r=44 a typical flare crest renders
+// ~2px — the fight stays visible at the size the ball holds longest (the
+// 4-option cards freed the vertical room).
+const SIZE: Record<Step, number> = { start: 152, quiz: 88, thinking: 124, result: 168, error: 124 };
 
 // The wobbling perimeter needs room beyond the nominal circle: the SVG box is
 // 200% of the button, and the viewBox reserves the same 2× in unit space.
 // Worst case stacks full churn + piled flares + a hard glide: 1 + boosted
 // waves + breathe + pulse + sag + flare cap + maxDrag + maxLag ≈ 1.93 —
-// blob.test.ts pins the shape inside this box. (The gulp scales the whole
+// blob.test.ts pins the shape inside this box. (The burst scales the whole
 // button, SVG included, so it can't push the shape out.)
 const OVERDRAW = 2;
 
@@ -55,7 +55,7 @@ const REST_PATH = blobPath(0);
 
 const within = ([min, max]: readonly [number, number]) => min + Math.random() * (max - min);
 
-export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobProps) {
+export function Blob({ step, species, charging = false, onBegin }: BlobProps) {
   const prefersReducedMotion = useReducedMotion();
   const interactive = step === 'start';
   const alive = BLOB.alive && !prefersReducedMotion;
@@ -67,12 +67,17 @@ export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobP
   // pointer is engaged — hover/press feedback must stay the loudest scale cue.
   const stepRef = useRef(step);
   const engagedRef = useRef(false);
+  const chargingRef = useRef(charging);
+  // Pointer-charged churn, consumed by the loop next frame: the energy
+  // bristles when a hand approaches the containment (see BLOB.agitation.kick).
+  const kickRef = useRef(0);
   useEffect(() => {
     stepRef.current = step;
+    chargingRef.current = charging;
     // The button disables off the start screen, so a hover that rides into
     // `begin` never gets its onHoverEnd — clear the flag on every step change.
     engagedRef.current = false;
-  }, [step]);
+  }, [step, charging]);
 
   // The life loop: advance the surface waves and read the button's real
   // on-screen center each frame — Motion's springs move it, we just measure —
@@ -103,6 +108,11 @@ export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobP
     let nextFlareAt = t + within(BLOB.flare.gap);
     let agitation = 0;
     let prevSpeed = 0;
+    // Final-beat charge clock (t-space): set on the first charging frame,
+    // anchored at touchdown so the cycles start where the burst would have.
+    let chargeStart: number | undefined;
+    let chargeLevel = 0;
+    let chargeSwell = 0;
 
     const tick = (now: number) => {
       const rect = el.getBoundingClientRect();
@@ -149,25 +159,72 @@ export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobP
 
         // Churn: shoves charge it, tau rings it down. Arrival from a glide is
         // the big shove — the surface roils as the ball regroups, then settles.
+        // Pointer kicks (kickRef, charged by the hover/tap handlers below) pour
+        // in on top: transient shimmer only, so the sustained hover scale
+        // stays the loudest cue.
         agitation = Math.min(
           1,
           agitation * Math.exp(-dt / BLOB.agitation.tau) +
-            Math.abs(speed - prevSpeed) * BLOB.agitation.gain,
+            Math.abs(speed - prevSpeed) * BLOB.agitation.gain +
+            kickRef.current,
         );
+        kickRef.current = 0;
         prevSpeed = speed;
+
+        // Final-beat charge: from touchdown the storm ramps in. The floor is
+        // fed into the real agitation accumulator (not maxed at use), so when
+        // the charge ends the churn decays naturally through the reveal pop
+        // instead of snapping off. The swell breathes in sin² cycles — silent
+        // and flat at every boundary, which is where Quiz cuts to the reveal,
+        // so the surge in flight always completes.
+        if (chargingRef.current) {
+          chargeStart ??= t + BURST_DELAY;
+          const into = t - chargeStart;
+          // The ramp counts from the step change (into + BURST_DELAY), not
+          // touchdown — the violence builds through the descent so the ball
+          // lands already storming and the first thump hits on arrival.
+          chargeLevel = Math.min(1, Math.max(0, (into + BURST_DELAY) / BLOB.charge.ramp));
+          if (into > 0) {
+            // Each cycle: a springy THUMP at the start (pulseSwell, spent well
+            // before the boundary) into the sin² swell mid-cycle.
+            chargeSwell =
+              chargeLevel *
+              (BLOB.charge.swell *
+                Math.sin(Math.PI * ((into / BLOB.charge.period) % 1)) ** 2 +
+                BLOB.charge.pulse * pulseSwell(into % BLOB.charge.period));
+          } else {
+            chargeSwell = 0;
+          }
+          agitation = Math.max(agitation, chargeLevel * BLOB.charge.agitation);
+        } else {
+          chargeStart = undefined;
+          chargeLevel = 0;
+          chargeSwell = 0;
+        }
 
         // Escape attempts fire on every step — they're the ball's substance,
         // not a UI cue, so no idle gate (contrast the pulse above, which
         // competes with pointer scale feedback). Churn shortens the gap: the
-        // energy fights hardest right after being dragged around.
+        // energy fights hardest right after being dragged around. Direction is
+        // biased to where the energy already is: chasing the wake during
+        // travel, favoring the crown at rest — the pooled mass at the base
+        // doesn't erupt downward (triangular spread around the bias center).
         if (t >= nextFlareAt) {
+          const traveling = speed > BLOB.flare.bias.travel;
+          const center = traveling ? Math.atan2(-sy, -sx) : -Math.PI / 2;
+          const spread = BLOB.flare.bias.spread[traveling ? 0 : 1];
           flares.push({
-            dir: Math.random() * 2 * Math.PI,
+            dir: center + (Math.random() + Math.random() - 1) * spread,
             width: within(BLOB.flare.width),
-            amp: within(BLOB.flare.amp),
+            // The charge storm fights bigger, not just more often.
+            amp: within(BLOB.flare.amp) * (1 + (BLOB.charge.flareAmp - 1) * chargeLevel),
             at: t,
           });
-          nextFlareAt = t + within(BLOB.flare.gap) * (1 - BLOB.agitation.flareRate * agitation);
+          nextFlareAt =
+            t +
+            within(BLOB.flare.gap) *
+              (1 - BLOB.agitation.flareRate * agitation) *
+              (1 - BLOB.charge.flareGap * chargeLevel);
         }
         while (flares.length && (t - flares[0].at) * BLOB.flare.decay > 8) flares.shift();
 
@@ -178,7 +235,7 @@ export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobP
           lag: speed * BLOB.lag,
           drag: speed * BLOB.drag,
           dir: Math.atan2(sy, sx),
-          swell: pulseSwell(t - pulseAt),
+          swell: pulseSwell(t - pulseAt) + chargeSwell,
           agitation,
           flares: flares.map((f) => ({ dir: f.dir, width: f.width, amp: f.amp, elapsed: t - f.at })),
         };
@@ -194,15 +251,16 @@ export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobP
     return () => cancelAnimationFrame(raf);
   }, [alive]);
 
-  // The thinking-beat gulp: squash-and-stretch keyframes on the scale channels.
-  // Between questions, the size runs a centered swell→hold→shrink while the
-  // ball hops on the y channel (the "bounce" is position — rationale in
-  // motion.ts), so the next quiz step is position-only; on the final answer,
-  // the blob stays large and hands off to the result pop. Off the thinking
-  // step every channel pins back to rest (scale 1, y 0), so an interrupted
-  // gulp can never strand the ball squashed or lifted.
-  const gulping = step === 'thinking' && !prefersReducedMotion;
-  const returning = gulping && returnToQuizSize;
+  // The thinking-beat burst: the size channel grows to the thinking size on
+  // the shared GLIDE spring *during* the descent (travel and growth are one
+  // motion), then BURST flexes the ball past that size — a uniform scale
+  // swell paired with the one hop, one gesture at the bottom. The shrink back
+  // to quiz size rides the next step change, deflating during the ascent. Off
+  // the thinking step every transient channel pins back to rest (scale 1,
+  // y 0), so an interrupted beat can never strand the ball swollen or lifted.
+  // The FINAL beat skips the burst: the charge storm (frame loop above) owns
+  // that dwell, and its swell lives in the shape engine, not the scale channel.
+  const bursting = step === 'thinking' && !charging && !prefersReducedMotion;
 
   return (
     <motion.button
@@ -218,33 +276,34 @@ export function Blob({ step, species, returnToQuizSize = false, onBegin }: BlobP
       disabled={!interactive}
       onClick={interactive ? onBegin : undefined}
       animate={{
-        width: returning ? THINKING_RETURN_SIZE : SIZE[step],
-        height: returning ? THINKING_RETURN_SIZE : SIZE[step],
-        y: returning ? GULP_HOP_KEYFRAMES.y : 0,
-        ...(gulping ? GULP_KEYFRAMES : { scaleX: 1, scaleY: 1 }),
+        width: SIZE[step],
+        height: SIZE[step],
+        ...(bursting ? BURST_KEYFRAMES : { scale: 1, y: 0 }),
       }}
       // Size: the result rides POP (the reveal bounce); everything else the calm
-      // GLIDE. Position: pinned to the shared GLIDE so blob and chrome travel on
-      // one spring.
+      // GLIDE — including the thinking growth, so size and travel share one
+      // spring. Position: pinned to the same GLIDE so blob and chrome never
+      // desync. The burst gesture (scale + hop) has its own delayed keyframes.
       transition={{
         ...(step === 'result' ? POP : GLIDE),
         layout: GLIDE,
-        ...(gulping
-          ? {
-              scaleX: GULP,
-              scaleY: GULP,
-              width: returning ? GULP_RETURN_SIZE : GULP_SIZE,
-              height: returning ? GULP_RETURN_SIZE : GULP_SIZE,
-              ...(returning ? { y: GULP_HOP } : {}),
-            }
-          : {}),
+        ...(bursting ? { scale: BURST, y: BURST } : {}),
       }}
       whileHover={interactive && !prefersReducedMotion ? PRESS_HERO.whileHover : undefined}
       whileTap={interactive && !prefersReducedMotion ? PRESS_HERO.whileTap : undefined}
-      // Engagement flags for the surprise pulse (see the stepRef effect above).
-      onHoverStart={() => (engagedRef.current = true)}
+      // Engagement flags for the surprise pulse, plus the churn kick — the
+      // energy bristles at an approaching hand, harder under a press. The kick
+      // is shimmer-only and transient, so hover's sustained +8% scale stays
+      // the loudest cue (ambient ranks under interactive on both axes).
+      onHoverStart={() => {
+        engagedRef.current = true;
+        kickRef.current += BLOB.agitation.kick.hover;
+      }}
       onHoverEnd={() => (engagedRef.current = false)}
-      onTapStart={() => (engagedRef.current = true)}
+      onTapStart={() => {
+        engagedRef.current = true;
+        kickRef.current += BLOB.agitation.kick.press;
+      }}
       onTapCancel={() => (engagedRef.current = false)}
       className={`relative shrink-0 rounded-full @container-size enabled:cursor-pointer ${
         alive ? '' : 'bg-accent transition-colors duration-(--theme-fade)'
