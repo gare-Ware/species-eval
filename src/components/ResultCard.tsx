@@ -21,8 +21,9 @@ import { InlineMarkdown } from './InlineMarkdown';
 interface ResultCardProps {
   species: Species;
   /**
-   * Phase-3 seam: the AI route will pass a personalized writeup here; defaults
-   * to the species' authored description.
+   * The AI-generated personalized writeup from POST /api/result. Defaults to the
+   * species' authored description when absent (e.g. the reduced-motion-instant
+   * path before a narrative lands, or older callers).
    */
   narrative?: string;
   headingRef?: Ref<HTMLHeadingElement>;

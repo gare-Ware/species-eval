@@ -34,8 +34,9 @@ interface BlobProps {
 
 // The one persistent element: never unmounts, only changes size (animate) and
 // position (layout) — the continuity that makes the flow read as one scene.
-// 'thinking' is the enlarged between-question size.
-const SIZE: Record<Step, number> = { start: 152, quiz: 64, thinking: 120, result: 168 };
+// 'thinking' is the enlarged between-question size; 'error' holds that same
+// size — the ball that was "thinking" for you, caught mid-thought.
+const SIZE: Record<Step, number> = { start: 152, quiz: 64, thinking: 120, result: 168, error: 120 };
 // Between-question return stations (swell → hold under the hop → shrink);
 // their times/eases live with GULP_RETURN_SIZE in motion.ts so the pairing is
 // a one-screen edit.
