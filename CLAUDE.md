@@ -25,7 +25,9 @@ AI-generated personalized result. Human-facing overview and setup live in `READM
 - Package manager: npm
 - AI: single server-side call for the result narrative — `POST /api/result`
   (`src/app/api/result/route.ts`), behind a provider seam (`src/lib/narrative/providers/`:
-  `mock` default, `anthropic` real adapter on `claude-haiku-4-5`, chosen via `AI_PROVIDER`)
+  local/dev/test default to `mock` when `AI_PROVIDER` is unset; production requires explicit
+  `AI_PROVIDER=mock` or `AI_PROVIDER=anthropic`; `ANTHROPIC_MODEL` defaults to
+  `claude-haiku-4-5`)
 
 ## Architecture & key decisions
 - **Client-side app with one server route.** Everything else runs client-side; the one API
@@ -37,9 +39,9 @@ AI-generated personalized result. Human-facing overview and setup live in `READM
   more species (`scores` keyed by `SpeciesId`). Tally across all answers; highest total wins;
   ties break by species declaration order (reproducible across retakes). The full tally is
   the "answer profile."
-- **AI generates the result narrative only.** The API route receives the winning species plus
-  the answer profile and returns a personalized "you as this species" writeup. AI never selects
-  the species in v1.
+- **AI generates the result narrative only.** The API route receives answer IDs, reconstructs
+  the chosen options from `questions.ts`, recomputes the winning species/profile server-side,
+  and returns a personalized "you as this species" writeup. AI never selects the species in v1.
 - **Data lives in typed TS files:** `src/data/species.ts` and `src/data/questions.ts` are the
   canonical source for the type contracts (`Species`, `Option`, `Question`). A `SpeciesId`
   union types every `scores` map so a mistyped id fails compilation; data is declared with
@@ -70,7 +72,7 @@ AI-generated personalized result. Human-facing overview and setup live in `READM
   lives. `Quiz` overrides `--foreground`/`--accent` inline for the species takeover; retake
   clears it. Components use `bg-background`/`text-foreground`/`text-accent` (+ opacity
   modifiers), never raw white/black.
-- Phase-3 chrome is token-driven from `globals.css`: `--frame-width`/`--frame-radius` (poster
+- Chrome is token-driven from `globals.css`: `--frame-width`/`--frame-radius` (poster
   border; 0px removes it), `--headline-width` (billboard sizing, height-capped so the start
   screen never scrolls), `--display-weight`/`--display-stretch` (display type; stretch is
   inert for Fraunces — no wdth axis).

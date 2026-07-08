@@ -13,7 +13,7 @@ import { buildNarrativeInput, InvalidNarrativeRequest } from '@/lib/narrative/re
 import type { NarrativeResponse } from '@/lib/narrative/types';
 import { validateNarrative } from '@/lib/narrative/validate';
 
-// The Anthropic SDK (added in a later branch) needs the Node runtime, not edge.
+// The Anthropic SDK needs the Node runtime, not edge.
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
