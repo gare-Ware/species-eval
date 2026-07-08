@@ -12,7 +12,7 @@ import type { SpeciesId } from '@/data/species';
 export type AnswerProfile = Record<ActiveSpeciesId, number>;
 
 export interface QuizResult {
-  /** Full per-species tally — the "answer profile" (carried to the AI route in Phase 3). */
+  /** Full per-species tally — the answer profile carried into the narrative prompt. */
   profile: AnswerProfile;
   /** Winning species id: highest total, ties broken by ACTIVE_SPECIES_IDS order. */
   winnerId: ActiveSpeciesId;

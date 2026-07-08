@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSpecies } from '@/data/species';
 import type { NarrativeInput } from '../types';
 
@@ -10,7 +10,7 @@ vi.mock('@anthropic-ai/sdk', () => ({
   },
 }));
 
-import { anthropicProvider } from './anthropic';
+import { DEFAULT_ANTHROPIC_MODEL, anthropicProvider, getAnthropicModel } from './anthropic';
 
 const input: NarrativeInput = {
   species: getSpecies('grays'),
@@ -27,6 +27,11 @@ describe('anthropicProvider', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test-key';
   });
 
+  afterEach(() => {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_MODEL;
+  });
+
   it('sends the built prompt and returns the joined, trimmed text', async () => {
     createMock.mockResolvedValue({
       content: [
@@ -41,13 +46,23 @@ describe('anthropicProvider', () => {
 
     expect(createMock).toHaveBeenCalledOnce();
     const params = createMock.mock.calls[0][0];
-    expect(params.model).toBe('claude-haiku-4-5');
+    expect(params.model).toBe(DEFAULT_ANTHROPIC_MODEL);
     expect(params.max_tokens).toBeGreaterThan(0);
     // The shared prompt is passed through: winner in the system prompt, the
     // reader's answers in the user turn.
     expect(params.system).toContain('Grays');
     expect(params.messages[0]).toMatchObject({ role: 'user' });
     expect(params.messages[0].content).toContain(input.answers[0].choice);
+  });
+
+  it('allows ANTHROPIC_MODEL to override the default model', async () => {
+    process.env.ANTHROPIC_MODEL = 'claude-test-model';
+    createMock.mockResolvedValue({ content: [{ type: 'text', text: 'Custom model reply.' }] });
+
+    expect(getAnthropicModel()).toBe('claude-test-model');
+    await anthropicProvider.generateResultNarrative(input);
+
+    expect(createMock.mock.calls[0][0].model).toBe('claude-test-model');
   });
 
   it('throws when ANTHROPIC_API_KEY is missing', async () => {

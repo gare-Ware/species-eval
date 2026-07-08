@@ -8,13 +8,16 @@ handful of alien species, with a personalized "you as this species" result.
 - **Scoring is deterministic.** Each answer option awards weighted points to one or more
   species; the highest total across all answers wins, with ties broken by species declaration
   order so retakes are reproducible.
-- **AI writes the narrative only** (planned for v1, not built yet): a single server-side API
-  route will call the Anthropic API to generate the result writeup. AI never picks the species.
+- **AI writes the narrative only.** A single server-side API route recomputes the result from
+  the submitted answer IDs and asks the configured narrative provider for the personalized
+  writeup. AI never picks the species.
 - **12 species are authored, 5 are active.** The live roster is controlled by
   `ACTIVE_SPECIES_IDS` in `src/data/species.ts`; scoring ignores points for inactive species.
 
-No database, no auth, no persistence — everything runs client-side except the (planned)
-narrative route.
+No database, no auth, no persistence — everything runs client-side except `POST /api/result`.
+Local dev defaults to the deterministic mock narrative provider. Production requires an
+explicit `AI_PROVIDER` (`mock` or `anthropic`) so a mock deploy is always intentional; the
+Anthropic adapter uses `ANTHROPIC_API_KEY` and defaults to `ANTHROPIC_MODEL=claude-haiku-4-5`.
 
 ## Stack
 
@@ -50,7 +53,7 @@ npm run dev   # → http://localhost:3000
 src/
   app/          Next.js app shell, global styles, fonts
   data/         species.ts, questions.ts — typed quiz content (+ integrity tests)
-  lib/          flow (step machine) · scoring · motion (animation vocabulary) · slowmo (dev toggle)
+  lib/          flow · scoring · narrative providers/prompting · motion · slowmo
   components/   Quiz orchestrator · StartScreen / QuestionCard / ResultCard · Blob / Starscape / SpeciesGlyph
 tests/e2e/      Playwright smoke tests for behavior contracts, not visual snapshots
 ```
