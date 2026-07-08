@@ -9,7 +9,14 @@ import { getSpecies } from '@/data/species';
 import type { QuizEvent } from '@/lib/flow';
 import { INITIAL_FLOW, quizFlowReducer } from '@/lib/flow';
 import { scoreQuiz } from '@/lib/scoring';
-import { FADE, fadeSlide, REDUCED_THINK_DWELL_MS, THINK_DWELL_MS } from '@/lib/motion';
+import {
+  CHARGE_CYCLE_MS,
+  FADE,
+  fadeSlide,
+  FINAL_BEAT_INTRO_MS,
+  REDUCED_THINK_DWELL_MS,
+  THINK_DWELL_MS,
+} from '@/lib/motion';
 import { useNarrative } from '@/hooks/useNarrative';
 import { Starscape } from './Starscape';
 // Frame is parked, not gone: the accent border read too bright against the dark
@@ -33,9 +40,9 @@ export function Quiz() {
   const prefersReducedMotion = useReducedMotion();
   const [{ step, answers }, dispatch] = useReducer(quizFlowReducer, INITIAL_FLOW);
   const narrative = useNarrative();
-  // The final beat blocks on the narrative: this is the *minimum* dwell timer's
-  // completion, gated together with the fetch by the effect below.
-  const [floorMet, setFloorMet] = useState(false);
+  // The final beat's clock anchor, set at the card's exit-complete: the blob's
+  // charge cycles and the reveal quantization below both count from it.
+  const [beatStart, setBeatStart] = useState<number | null>(null);
   const thinkTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const hasUserNavigated = useRef(false);
   const startHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -86,19 +93,34 @@ export function Quiz() {
     send({ type: 'retake' });
   }
 
-  // Final beat blocks the reveal on the narrative: advance only once BOTH the
-  // minimum beat has elapsed (floorMet) and the fetch has settled — reveal on
-  // success, fail into the error state otherwise.
+  // Final beat: the reveal waits on the narrative AND lands on a charge-cycle
+  // boundary. The blob's charge storm breathes in sin² swell cycles (silent
+  // and flat at every boundary — see BLOB.charge); when the fetch settles,
+  // the dispatch is scheduled for the next boundary at least one full surge
+  // in, so the cycle in flight always completes — whether the result arrives
+  // before the ball even lands or the loop has been breathing for ten
+  // seconds. Reveal on success, fail into the error state otherwise.
   useEffect(() => {
-    if (!isFinalThinkingBeat || !floorMet) return;
-    if (narrative.status === 'ready') dispatch({ type: 'advance' });
-    else if (narrative.status === 'error') dispatch({ type: 'fail' });
-  }, [isFinalThinkingBeat, floorMet, narrative.status]);
+    if (!isFinalThinkingBeat || beatStart === null) return;
+    if (narrative.status !== 'ready' && narrative.status !== 'error') return;
+    const event: QuizEvent =
+      narrative.status === 'ready' ? { type: 'advance' } : { type: 'fail' };
+    const elapsed = performance.now() - beatStart;
+    const wait = prefersReducedMotion
+      ? 0
+      : Math.max(
+          FINAL_BEAT_INTRO_MS + CHARGE_CYCLE_MS,
+          FINAL_BEAT_INTRO_MS +
+            Math.ceil((elapsed - FINAL_BEAT_INTRO_MS) / CHARGE_CYCLE_MS) * CHARGE_CYCLE_MS,
+        ) - elapsed;
+    const timer = setTimeout(() => dispatch(event), Math.max(0, wait));
+    return () => clearTimeout(timer);
+  }, [isFinalThinkingBeat, beatStart, narrative.status, prefersReducedMotion]);
 
-  // The floor is a per-beat latch; clear it whenever we're not in a beat so the
-  // next one (including a retry) starts fresh.
+  // Per-beat latch: clear the anchor whenever we're not in a beat so the next
+  // one (including a retry) starts fresh.
   useEffect(() => {
-    if (step !== 'thinking') setFloorMet(false);
+    if (step !== 'thinking') setBeatStart(null);
   }, [step]);
 
   useEffect(() => {
@@ -150,7 +172,7 @@ export function Quiz() {
         <Blob
           step={step}
           species={winner}
-          returnToQuizSize={step === 'thinking' && !isFinalThinkingBeat}
+          charging={isFinalThinkingBeat}
           onBegin={() => send({ type: 'begin' })}
         />
 
@@ -183,15 +205,16 @@ export function Quiz() {
           mode="popLayout"
           onExitComplete={() => {
             // A card just finished exiting into a beat. Non-final beats wind up
-            // on a fixed dwell; the final beat instead latches the *minimum*
-            // dwell and lets the gating effect above release the reveal once the
-            // narrative resolves. (Retry re-enters here when the error card exits.)
+            // on a fixed dwell; the final beat instead anchors the charge clock
+            // and lets the gating effect above schedule the reveal on a cycle
+            // boundary once the narrative resolves. (Retry re-enters here when
+            // the error card exits.)
             if (step !== 'thinking') return;
             clearTimeout(thinkTimer.current);
-            const dwell = prefersReducedMotion ? REDUCED_THINK_DWELL_MS : THINK_DWELL_MS;
             if (isFinalThinkingBeat) {
-              thinkTimer.current = setTimeout(() => setFloorMet(true), dwell);
+              setBeatStart(performance.now());
             } else {
+              const dwell = prefersReducedMotion ? REDUCED_THINK_DWELL_MS : THINK_DWELL_MS;
               thinkTimer.current = setTimeout(() => dispatch({ type: 'advance' }), dwell);
             }
           }}

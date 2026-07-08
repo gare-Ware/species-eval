@@ -8,11 +8,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import { buildNarrativePrompt } from '../prompt';
 import type { NarrativeInput, NarrativeProvider } from '../types';
 
-// Haiku 4.5: fast and cheap for a ~130-word reading, comfortably inside the
-// reveal beat. Swap this one line to change models (Haiku rejects the `effort`
-// param, so don't add it here).
-const MODEL = 'claude-haiku-4-5';
-// The route caps the reading at NARRATIVE_MAX_CHARS (~1600 chars ≈ 400
+// Haiku 4.5: fast and cheap for a compact reading, comfortably inside the
+// reveal beat. Override with ANTHROPIC_MODEL when auditioning or pinning a
+// different Claude API model.
+export const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5';
+// The route caps the reading at NARRATIVE_MAX_CHARS (1000 chars, roughly 250
 // tokens); 512 leaves head-room while still bounding a truly runaway reply.
 const MAX_TOKENS = 512;
 
@@ -27,13 +27,17 @@ function getClient(): Anthropic {
   return client;
 }
 
+export function getAnthropicModel(): string {
+  return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_ANTHROPIC_MODEL;
+}
+
 export const anthropicProvider: NarrativeProvider = {
   id: 'anthropic',
   async generateResultNarrative(input: NarrativeInput): Promise<string> {
     const { system, user } = buildNarrativePrompt(input);
 
     const message = await getClient().messages.create({
-      model: MODEL,
+      model: getAnthropicModel(),
       max_tokens: MAX_TOKENS,
       system,
       messages: [{ role: 'user', content: user }],

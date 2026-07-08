@@ -1,14 +1,18 @@
 import { expect, test } from '@playwright/test';
 
 const QUESTION_COUNT = 6;
-const OPTION_COUNT = 5;
+const OPTION_COUNT = 4;
 
+// Four options serve five species, so a species' best option moves around per
+// question (its sit-out question offers it only a secondary). Each path below
+// is the species' best-option-per-question run — the same "strongest possible
+// run" integrity.test.ts proves must win.
 const SPECIES_CASES = [
-  { name: 'Grays', optionIndex: 0 },
-  { name: 'Nordics', optionIndex: 1 },
-  { name: 'Reptilians', optionIndex: 2 },
-  { name: 'Mantids', optionIndex: 3 },
-  { name: 'Hybrids', optionIndex: 4 },
+  { name: 'Grays', path: [0, 0, 2, 0, 0, 0] },
+  { name: 'Nordics', path: [1, 1, 0, 1, 1, 3] },
+  { name: 'Reptilians', path: [2, 2, 1, 2, 1, 1] },
+  { name: 'Mantids', path: [3, 0, 2, 2, 2, 2] },
+  { name: 'Hybrids', path: [1, 3, 3, 3, 3, 3] },
 ];
 
 function currentQuestion(page) {
@@ -38,7 +42,7 @@ async function answerCurrentQuestion(page, optionIndex) {
 
 async function playSpeciesPath(page, speciesCase) {
   for (let question = 1; question <= QUESTION_COUNT; question += 1) {
-    await answerCurrentQuestion(page, speciesCase.optionIndex);
+    await answerCurrentQuestion(page, speciesCase.path[question - 1]);
 
     if (question < QUESTION_COUNT) {
       await expectQuestion(page, question + 1);
@@ -54,13 +58,13 @@ test('completes the quiz, locks answers during confirmation, and retakes cleanly
   await page.goto('/');
   await beginQuiz(page);
 
-  const answers = await answerCurrentQuestion(page, speciesCase.optionIndex);
-  await expect(answers.nth(speciesCase.optionIndex)).toBeDisabled();
+  const answers = await answerCurrentQuestion(page, speciesCase.path[0]);
+  await expect(answers.nth(speciesCase.path[0])).toBeDisabled();
   await expect(answers.nth(1)).toBeDisabled();
   await expectQuestion(page, 2);
 
   for (let question = 2; question <= QUESTION_COUNT; question += 1) {
-    await answerCurrentQuestion(page, speciesCase.optionIndex);
+    await answerCurrentQuestion(page, speciesCase.path[question - 1]);
 
     if (question < QUESTION_COUNT) {
       await expectQuestion(page, question + 1);
