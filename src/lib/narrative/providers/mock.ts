@@ -16,14 +16,11 @@ export const mockProvider: NarrativeProvider = {
     const closer = answers[answers.length - 1]?.choice.trim();
 
     return [
-      `The signal resolves and it's unmistakable — you're *${species.name}*, through and through.`,
-      opener ? `Faced with a fresh start, your instinct gave you away — "${opener}"` : '',
-      `That's the ${primaryTrait} in you talking, shot through with a ${secondaryTrait} ` +
-        'streak the rest of us never quite manage to place.',
-      closer ? `And when it truly counts, you fall back on one rule: "${closer}"` : '',
-      `${species.tagline} Everyone else is just now catching up.`,
+      `You are *${species.name}*: ${opener ? `"${opener}"` : species.tagline} gives away the ${primaryTrait} in you.`,
+      closer
+        ? `When pressure peaks, "${closer}" becomes the rule, sharpened by a ${secondaryTrait} streak.`
+        : `Under pressure, that ${secondaryTrait} streak turns instinct into a signature.`,
     ]
-      .filter(Boolean)
       .join(' ');
   },
 };

@@ -5,16 +5,16 @@
 // 502 and the client's honest error state — there is no silent fallback here.
 
 import Anthropic from '@anthropic-ai/sdk';
-import { buildNarrativePrompt } from '../prompt';
+import { buildNarrativePrompt, NARRATIVE_MAX_CHARS } from '../prompt';
 import type { NarrativeInput, NarrativeProvider } from '../types';
 
 // Haiku 4.5: fast and cheap for a compact reading, comfortably inside the
 // reveal beat. Override with ANTHROPIC_MODEL when auditioning or pinning a
 // different Claude API model.
 export const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5';
-// The route caps the reading at NARRATIVE_MAX_CHARS (1000 chars, roughly 250
-// tokens); 512 leaves head-room while still bounding a truly runaway reply.
-const MAX_TOKENS = 512;
+// The route caps the reading at NARRATIVE_MAX_CHARS; this leaves headroom for
+// normal prose variance while nudging the model away from long-form answers.
+const MAX_TOKENS = Math.ceil(NARRATIVE_MAX_CHARS / 3);
 
 // Lazy singleton so the module imports cleanly even when no key is set (the
 // mock path never constructs this). The key is re-checked on every call.
