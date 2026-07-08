@@ -88,7 +88,7 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
     <motion.section
       ref={ref}
       aria-labelledby="result-title"
-      className="flex w-full flex-col items-center gap-6 text-center"
+      className="flex w-full flex-col items-center gap-4 text-center sm:gap-5"
       variants={containerVariants}
       initial="hidden"
       animate="show"
@@ -106,17 +106,20 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
           ref={headingRef}
           tabIndex={-1}
           variants={nameVariants}
-          className="text-5xl uppercase text-accent focus:outline-none sm:text-6xl"
+          className="text-4xl uppercase text-accent focus:outline-none sm:text-5xl"
           style={{ fontStretch: 'var(--display-stretch)', fontWeight: 'var(--display-weight)' }}
         >
           {species.name}
         </motion.h1>
-        <motion.p variants={itemVariants} className="text-lg text-foreground/75">
+        <motion.p variants={itemVariants} className="text-base text-pretty text-foreground/75 sm:text-lg">
           {species.tagline}
         </motion.p>
       </div>
 
-      <motion.p variants={itemVariants} className="leading-relaxed text-foreground/85">
+      <motion.p
+        variants={itemVariants}
+        className="max-w-[34rem] text-pretty text-[0.98rem] leading-snug text-foreground/85 sm:text-base sm:leading-normal"
+      >
         <InlineMarkdown text={body} />
       </motion.p>
 
@@ -139,7 +142,7 @@ export const ResultCard = forwardRef<HTMLElement, ResultCardProps>(function Resu
           onClick={onRetake}
           {...(prefersReducedMotion ? {} : PRESS)}
           // Control voice (mono label) + flat frost fill — see QuestionCard.
-          className="mt-2 rounded-full border border-foreground/15 bg-foreground/10 px-6 py-3 font-mono text-xs uppercase tracking-[0.2em] transition-colors hover:border-foreground/40 hover:bg-foreground/16"
+          className="mt-1 rounded-full border border-foreground/15 bg-foreground/10 px-6 py-3 font-mono text-xs uppercase tracking-[0.2em] transition-colors hover:border-foreground/40 hover:bg-foreground/16"
         >
           Take it again
         </motion.button>

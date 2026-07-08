@@ -61,6 +61,39 @@ test('holds the reveal until the narrative arrives, then renders it', async ({ p
   await expect(result).toContainText('Held reading, shown only once it arrives');
 });
 
+test('keeps a near-limit result inside a large laptop viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const narrative = [
+    'You are unmistakably Grays: the way you reach for clean plans, quiet evidence, and a controlled room gives away the signal before anyone can ask twice.',
+    'When pressure rises, you turn a simple rule into orbit, doing the work with cool hands, sharp timing, and just enough mystery to make the whole room lean closer.',
+    'That compact certainty is the point: no grand speech, no scattered sparks, only the eerie confidence of someone who already mapped the hallway before stepping through the door.',
+    'Everyone else is improvising; you are calibrating.',
+  ].join(' ');
+
+  await page.route('**/api/result', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ narrative }),
+    });
+  });
+
+  await page.goto('/');
+  await beginQuiz(page);
+  await answerAll(page);
+
+  const result = page.locator('section[aria-labelledby="result-title"]');
+  await expect(result).toBeVisible();
+
+  const overflow = await page.evaluate(() => ({
+    body: document.body.scrollHeight,
+    document: document.documentElement.scrollHeight,
+    viewport: window.innerHeight,
+  }));
+  expect(overflow.body).toBeLessThanOrEqual(overflow.viewport);
+  expect(overflow.document).toBeLessThanOrEqual(overflow.viewport);
+});
+
 test('shows the error state on failure and recovers on retry', async ({ page }) => {
   let attempt = 0;
   await page.route('**/api/result', async (route) => {
