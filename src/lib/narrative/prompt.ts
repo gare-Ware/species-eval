@@ -5,15 +5,28 @@
 
 import type { NarrativeInput } from './types';
 
-/** Target length for the reading (words). Encoded into the prompt. */
-export const NARRATIVE_WORD_RANGE = { min: 90, max: 130 } as const;
+/**
+ * Target length for the reading (words), encoded into the prompt. Anchored on
+ * the authored species descriptions (49–60 words, ~300–400 chars) — the length
+ * the result card was designed around. Stated BELOW that target on purpose:
+ * live models overshoot the stated max ~1.25× (probe-measured), so asking for
+ * 45–65 lands ~55–80 actual words. Retune from measurement, not intuition.
+ */
+export const NARRATIVE_WORD_RANGE = { min: 45, max: 65 } as const;
 
 /**
- * Hard character ceiling the route enforces on any provider's output — set a
- * little above 130 words of prose so a well-behaved reply passes and a runaway
- * one fails.
+ * Hard character ceiling the route enforces on any provider's output. This is
+ * a runaway guard, not a style check — the two are tuned independently: to
+ * shorten the *reading*, change NARRATIVE_WORD_RANGE; only re-derive this cap
+ * from the formula. Live models overshoot the stated max by ~1.2× and prose
+ * runs ~6–7 chars/word, so the worst realistic reply is
+ * max × 1.2 × 7 ≈ 670 chars; the cap sits ~50% above that so normal variance
+ * always passes and only a reply that ignored the length rule outright fails.
+ * (A cap set from paper math with no overshoot headroom caused intermittent
+ * 502s in live use — probe measured 3/6 Haiku replies over it. Don't
+ * re-tighten without re-measuring.)
  */
-export const NARRATIVE_MAX_CHARS = 900;
+export const NARRATIVE_MAX_CHARS = 1000;
 
 export interface NarrativePrompt {
   system: string;
@@ -36,8 +49,10 @@ export function buildNarrativePrompt(input: NarrativeInput): NarrativePrompt {
     '- Personalize: draw on the specific answers below so the reading feels earned, not ' +
       'generic. Reference the substance of their choices, never the quiz mechanics (do ' +
       'not mention "questions", "options", or "points").',
-    `- Length: ${NARRATIVE_WORD_RANGE.min}–${NARRATIVE_WORD_RANGE.max} words. One or two ` +
-      'short paragraphs.',
+    '- Length: AT MOST 3 sentences, in one short paragraph — aim for ' +
+      `${NARRATIVE_WORD_RANGE.min}–${NARRATIVE_WORD_RANGE.max} words. Reference only the ` +
+      'one or two most telling of their choices, not all of them. Horoscope-blurb ' +
+      'energy: every sentence has to earn its place.',
     '- Plain prose only. No headings, no lists, no HTML. You may use *asterisk emphasis* ' +
       'sparingly (once or twice at most); no other markdown.',
     '- Output only the reading itself — no preamble, no title, no surrounding quotation marks.',
