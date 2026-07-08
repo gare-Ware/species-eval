@@ -6,6 +6,7 @@ import type { Species } from '@/data/species';
 import type { Step } from '@/lib/flow';
 import {
   BURST,
+  BURST_DELAY,
   BURST_KEYFRAMES,
   EXIT,
   GLIDE,
@@ -22,6 +23,13 @@ interface BlobProps {
   step: Step;
   /** The winning species — only set during the result step. */
   species: Species | null;
+  /**
+   * The final thinking beat: the narrative call is in flight and the reveal is
+   * next. The ball skips the between-question burst+hop and CHARGES instead —
+   * the storm in BLOB.charge — while Quiz holds the reveal for a swell-cycle
+   * boundary so the surge in progress always completes.
+   */
+  charging?: boolean;
   onBegin: () => void;
 }
 
@@ -47,7 +55,7 @@ const REST_PATH = blobPath(0);
 
 const within = ([min, max]: readonly [number, number]) => min + Math.random() * (max - min);
 
-export function Blob({ step, species, onBegin }: BlobProps) {
+export function Blob({ step, species, charging = false, onBegin }: BlobProps) {
   const prefersReducedMotion = useReducedMotion();
   const interactive = step === 'start';
   const alive = BLOB.alive && !prefersReducedMotion;
@@ -59,15 +67,17 @@ export function Blob({ step, species, onBegin }: BlobProps) {
   // pointer is engaged — hover/press feedback must stay the loudest scale cue.
   const stepRef = useRef(step);
   const engagedRef = useRef(false);
+  const chargingRef = useRef(charging);
   // Pointer-charged churn, consumed by the loop next frame: the energy
   // bristles when a hand approaches the containment (see BLOB.agitation.kick).
   const kickRef = useRef(0);
   useEffect(() => {
     stepRef.current = step;
+    chargingRef.current = charging;
     // The button disables off the start screen, so a hover that rides into
     // `begin` never gets its onHoverEnd — clear the flag on every step change.
     engagedRef.current = false;
-  }, [step]);
+  }, [step, charging]);
 
   // The life loop: advance the surface waves and read the button's real
   // on-screen center each frame — Motion's springs move it, we just measure —
@@ -98,6 +108,11 @@ export function Blob({ step, species, onBegin }: BlobProps) {
     let nextFlareAt = t + within(BLOB.flare.gap);
     let agitation = 0;
     let prevSpeed = 0;
+    // Final-beat charge clock (t-space): set on the first charging frame,
+    // anchored at touchdown so the cycles start where the burst would have.
+    let chargeStart: number | undefined;
+    let chargeLevel = 0;
+    let chargeSwell = 0;
 
     const tick = (now: number) => {
       const rect = el.getBoundingClientRect();
@@ -156,6 +171,29 @@ export function Blob({ step, species, onBegin }: BlobProps) {
         kickRef.current = 0;
         prevSpeed = speed;
 
+        // Final-beat charge: from touchdown the storm ramps in. The floor is
+        // fed into the real agitation accumulator (not maxed at use), so when
+        // the charge ends the churn decays naturally through the reveal pop
+        // instead of snapping off. The swell breathes in sin² cycles — silent
+        // and flat at every boundary, which is where Quiz cuts to the reveal,
+        // so the surge in flight always completes.
+        if (chargingRef.current) {
+          chargeStart ??= t + BURST_DELAY;
+          const into = t - chargeStart;
+          chargeLevel = Math.min(1, Math.max(0, into / BLOB.charge.ramp));
+          chargeSwell =
+            into > 0
+              ? chargeLevel *
+                BLOB.charge.swell *
+                Math.sin(Math.PI * ((into / BLOB.charge.period) % 1)) ** 2
+              : 0;
+          agitation = Math.max(agitation, chargeLevel * BLOB.charge.agitation);
+        } else {
+          chargeStart = undefined;
+          chargeLevel = 0;
+          chargeSwell = 0;
+        }
+
         // Escape attempts fire on every step — they're the ball's substance,
         // not a UI cue, so no idle gate (contrast the pulse above, which
         // competes with pointer scale feedback). Churn shortens the gap: the
@@ -170,10 +208,15 @@ export function Blob({ step, species, onBegin }: BlobProps) {
           flares.push({
             dir: center + (Math.random() + Math.random() - 1) * spread,
             width: within(BLOB.flare.width),
-            amp: within(BLOB.flare.amp),
+            // The charge storm fights bigger, not just more often.
+            amp: within(BLOB.flare.amp) * (1 + (BLOB.charge.flareAmp - 1) * chargeLevel),
             at: t,
           });
-          nextFlareAt = t + within(BLOB.flare.gap) * (1 - BLOB.agitation.flareRate * agitation);
+          nextFlareAt =
+            t +
+            within(BLOB.flare.gap) *
+              (1 - BLOB.agitation.flareRate * agitation) *
+              (1 - BLOB.charge.flareGap * chargeLevel);
         }
         while (flares.length && (t - flares[0].at) * BLOB.flare.decay > 8) flares.shift();
 
@@ -184,7 +227,7 @@ export function Blob({ step, species, onBegin }: BlobProps) {
           lag: speed * BLOB.lag,
           drag: speed * BLOB.drag,
           dir: Math.atan2(sy, sx),
-          swell: pulseSwell(t - pulseAt),
+          swell: pulseSwell(t - pulseAt) + chargeSwell,
           agitation,
           flares: flares.map((f) => ({ dir: f.dir, width: f.width, amp: f.amp, elapsed: t - f.at })),
         };
@@ -207,7 +250,9 @@ export function Blob({ step, species, onBegin }: BlobProps) {
   // to quiz size rides the next step change, deflating during the ascent. Off
   // the thinking step every transient channel pins back to rest (scale 1,
   // y 0), so an interrupted beat can never strand the ball swollen or lifted.
-  const thinking = step === 'thinking' && !prefersReducedMotion;
+  // The FINAL beat skips the burst: the charge storm (frame loop above) owns
+  // that dwell, and its swell lives in the shape engine, not the scale channel.
+  const bursting = step === 'thinking' && !charging && !prefersReducedMotion;
 
   return (
     <motion.button
@@ -225,7 +270,7 @@ export function Blob({ step, species, onBegin }: BlobProps) {
       animate={{
         width: SIZE[step],
         height: SIZE[step],
-        ...(thinking ? BURST_KEYFRAMES : { scale: 1, y: 0 }),
+        ...(bursting ? BURST_KEYFRAMES : { scale: 1, y: 0 }),
       }}
       // Size: the result rides POP (the reveal bounce); everything else the calm
       // GLIDE — including the thinking growth, so size and travel share one
@@ -234,7 +279,7 @@ export function Blob({ step, species, onBegin }: BlobProps) {
       transition={{
         ...(step === 'result' ? POP : GLIDE),
         layout: GLIDE,
-        ...(thinking ? { scale: BURST, y: BURST } : {}),
+        ...(bursting ? { scale: BURST, y: BURST } : {}),
       }}
       whileHover={interactive && !prefersReducedMotion ? PRESS_HERO.whileHover : undefined}
       whileTap={interactive && !prefersReducedMotion ? PRESS_HERO.whileTap : undefined}

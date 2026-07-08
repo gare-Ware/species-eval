@@ -51,9 +51,12 @@ AI-generated personalized result. Human-facing overview and setup live in `READM
   `blob` energy-ball shape engine (bursty waves/breathe/velocity physics; flares — localized
   escape attempts vs. the containment, direction-biased toward the crown at rest and the wake
   during travel; deceleration churn, also kicked by pointer engagement; a travel sag/regroup
-  wake; and a weight system — the base bulge pools on the exhale, and a calm-base gradient
-  keeps the crown crackling over a still base. Every tunable is in its `BLOB` config;
-  `BLOB.alive = false` reverts to a plain circle) · `slowmo` dev toggle
+  wake; a weight system — the base bulge pools on the exhale, and a calm-base gradient
+  keeps the crown crackling over a still base; and a final-beat charge storm — held
+  agitation, bigger/faster flares, sin² swell cycles — whose cycle boundaries are the only
+  points Quiz will fire the reveal on, so the surge in flight always completes. Every
+  tunable is in its `BLOB` config; `BLOB.alive = false` reverts to a plain circle) ·
+  `slowmo` dev toggle
 - `src/components/` — `Quiz` orchestrator + `StartScreen`/`QuestionCard`/`ResultCard` +
   `Blob`/`Starscape`/`SpeciesGlyph` + `Frame` (viewport poster border — currently parked:
   commented out in `Quiz`, too bright against the dark field at rest)

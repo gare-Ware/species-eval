@@ -30,6 +30,12 @@
 //   agitation — churn charged by shoves (|Δspeed|, accumulated in Blob.tsx):
 //               arriving from a glide spikes the shimmer and the flare rate,
 //               then rings down — the energy roils as it regroups
+//   charge    — the final-beat storm (scheduling in Blob.tsx): while the AI
+//               verdict is coming, agitation is held near max, flares spawn
+//               faster and bigger, and the whole ball breathes in sin² swell
+//               cycles — zero amplitude AND zero slope at every cycle
+//               boundary, so the reveal (which Quiz quantizes to a boundary)
+//               always launches from the trough of a completed surge
 //
 // Set BLOB.alive = false to revert to the plain filled circle (Blob.tsx renders
 // a plain bg-accent disc and skips the frame loop entirely).
@@ -162,6 +168,24 @@ export const BLOB = {
    * the loudest cue (the ambient-vs-interactive ranking).
    */
   agitation: { gain: 1 / 2600, tau: 0.55, waveGain: 0.7, flareRate: 0.55, kick: { hover: 0.3, press: 0.5 } },
+
+  /**
+   * Final-beat charge (Blob.tsx drives it while Quiz holds the reveal): the
+   * fight escalates while the verdict is coming. Everything is existing
+   * vocabulary turned up — no new physics:
+   *   period   — seconds per swell cycle. Quiz reveals only on a boundary
+   *              (see motion.ts CHARGE_CYCLE_MS), so keep them in sync via
+   *              this one number.
+   *   ramp     — seconds from touchdown to full storm
+   *   swell    — whole-ball breathing amplitude per cycle (sin² hump: silent
+   *              and flat at both ends, so any boundary is a clean cut)
+   *   agitation— churn floor at full charge (shimmer + flare rate ride it;
+   *              fed into the real accumulator so it decays naturally through
+   *              the reveal pop instead of snapping off)
+   *   flareAmp — flare amplitude multiplier at full charge
+   *   flareGap — extra spawn-gap cut at full charge (× (1 − this))
+   */
+  charge: { period: 1.1, ramp: 0.9, swell: 0.05, agitation: 0.85, flareAmp: 1.6, flareGap: 0.45 },
 
   /** Travel streak: extra trailing-hemisphere shimmer, ∝ normalized wake. */
   streak: 0.8,

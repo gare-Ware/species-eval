@@ -1,4 +1,5 @@
 import type { Transition, Variants } from 'motion/react';
+import { BLOB } from './blob';
 import { slow, slowMs } from './slowmo';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,6 +158,19 @@ export const THINK_DWELL_MS = slowMs(
   (BURST_DELAY + BURST_SECONDS + BURST_BUFFER - EXIT_SECONDS) * 1000,
 );
 export const REDUCED_THINK_DWELL_MS = 0;
+
+// Final thinking beat: no fixed dwell — the blob charges (BLOB.charge: flare
+// storm + sin² swell cycles) while the narrative call is in flight, and the
+// reveal is QUANTIZED to a swell-cycle boundary so the charge always finishes
+// the surge it started, no matter when the fetch settles. Both clocks anchor
+// at the ball's touchdown: the charge cycles start there (BURST_DELAY after
+// the step change), and Quiz's timer starts at the card's exit-complete
+// (EXIT_SECONDS after the same step change) — hence the subtraction. The
+// reveal fires at INTRO + k × CYCLE for the smallest k ≥ 1 not yet passed:
+// at least one full surge, and always released from the trough, where the
+// swell is silent and flat (any residual churn decays through the pop).
+export const FINAL_BEAT_INTRO_MS = slowMs((BURST_DELAY - EXIT_SECONDS) * 1000);
+export const CHARGE_CYCLE_MS = slowMs(BLOB.charge.period * 1000);
 
 // Result reveal timeline, budgeted to land inside ~1.5s (arrival moments buy
 // theater, but the whole load choreography stays under the guardrail): the

@@ -9,8 +9,9 @@ const OVERDRAW = 2;
 const FLARE_CREST = Math.PI / 2 / BLOB.flare.omega;
 
 // Everything at once, stacked adversarially: extreme velocity, the pulse at
-// max, full churn, and three max-amp flares piled on one direction (the soft
-// cap is what keeps that survivable).
+// max, full churn, and three flares piled on one direction at the biggest
+// amplitude the charge storm can spawn (the soft cap is what keeps that
+// survivable).
 const HARD_DEFORM = {
   lag: 99,
   drag: 99,
@@ -20,7 +21,7 @@ const HARD_DEFORM = {
   flares: [0, 1, 2].map(() => ({
     dir: Math.PI / 3,
     width: BLOB.flare.width[1],
-    amp: BLOB.flare.amp[1],
+    amp: BLOB.flare.amp[1] * BLOB.charge.flareAmp,
     elapsed: FLARE_CREST,
   })),
 };
