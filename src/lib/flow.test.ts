@@ -53,4 +53,37 @@ describe('quizFlowReducer', () => {
   it('retake returns to a clean start', () => {
     expect(quizFlowReducer(playThrough(), { type: 'retake' })).toEqual(INITIAL_FLOW);
   });
+
+  // The final beat blocks on the AI narrative; these cover the failure branch.
+  const finalBeat: QuizFlow = {
+    step: 'thinking',
+    answers: questions.map((q) => q.options[0]),
+  };
+
+  it('fail moves the final beat into the error state, keeping answers', () => {
+    const state = quizFlowReducer(finalBeat, { type: 'fail' });
+    expect(state.step).toBe('error');
+    expect(state.answers).toEqual(finalBeat.answers);
+  });
+
+  it('fail is a no-op outside the thinking beat', () => {
+    const quiz: QuizFlow = { step: 'quiz', answers: [] };
+    expect(quizFlowReducer(quiz, { type: 'fail' })).toBe(quiz);
+  });
+
+  it('retry re-enters the blocking beat from error with answers intact', () => {
+    const errored: QuizFlow = { step: 'error', answers: finalBeat.answers };
+    const state = quizFlowReducer(errored, { type: 'retry' });
+    expect(state.step).toBe('thinking');
+    expect(state.answers).toEqual(finalBeat.answers);
+  });
+
+  it('retry is a no-op outside the error state', () => {
+    expect(quizFlowReducer(finalBeat, { type: 'retry' })).toBe(finalBeat);
+  });
+
+  it('retake escapes the error state', () => {
+    const errored: QuizFlow = { step: 'error', answers: finalBeat.answers };
+    expect(quizFlowReducer(errored, { type: 'retake' })).toEqual(INITIAL_FLOW);
+  });
 });

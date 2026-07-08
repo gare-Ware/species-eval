@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useReducer, useRef } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/react';
 import { questions } from '@/data/questions';
+import type { Option } from '@/data/questions';
 import { getSpecies } from '@/data/species';
 import type { QuizEvent } from '@/lib/flow';
 import { INITIAL_FLOW, quizFlowReducer } from '@/lib/flow';
 import { scoreQuiz } from '@/lib/scoring';
 import { FADE, fadeSlide, REDUCED_THINK_DWELL_MS, THINK_DWELL_MS } from '@/lib/motion';
+import { useNarrative } from '@/hooks/useNarrative';
 import { Starscape } from './Starscape';
 // Frame is parked, not gone: the accent border read too bright against the dark
 // field at rest. Re-enable by uncommenting this and <Frame /> below.
@@ -17,6 +19,7 @@ import { Blob } from './Blob';
 import { StartScreen } from './StartScreen';
 import { QuestionCard } from './QuestionCard';
 import { ResultCard } from './ResultCard';
+import { ResultError } from './ResultError';
 
 // The bottom hint rides the same restrained rise/sink as the question cards.
 const hint = fadeSlide('below');
@@ -24,15 +27,21 @@ const hint = fadeSlide('below');
 // Single client orchestrator: renders one continuous scene around the step
 // machine (lib/flow.ts). The blob never unmounts — chrome and step content
 // animate around it while its `layout` prop glides it to each new spot. The
-// one side effect owned here is the thinking-beat timer.
+// side effects owned here are the thinking-beat timer and the AI narrative call
+// that the final beat blocks on.
 export function Quiz() {
   const prefersReducedMotion = useReducedMotion();
   const [{ step, answers }, dispatch] = useReducer(quizFlowReducer, INITIAL_FLOW);
+  const narrative = useNarrative();
+  // The final beat blocks on the narrative: this is the *minimum* dwell timer's
+  // completion, gated together with the fetch by the effect below.
+  const [floorMet, setFloorMet] = useState(false);
   const thinkTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const hasUserNavigated = useRef(false);
   const startHeadingRef = useRef<HTMLHeadingElement>(null);
   const questionHeadingRef = useRef<HTMLHeadingElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const errorHeadingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => () => clearTimeout(thinkTimer.current), []);
 
   // In 'quiz' the current question is always the one after the recorded answers.
@@ -46,6 +55,8 @@ export function Quiz() {
     announcement = 'Preparing your result';
   } else if (step === 'thinking') {
     announcement = 'Preparing the next question';
+  } else if (step === 'error') {
+    announcement = 'We could not generate your result. Try again.';
   } else if (winner) {
     announcement = `Result: Species match, ${winner.name}`;
   }
@@ -56,6 +67,40 @@ export function Quiz() {
     dispatch(event);
   }
 
+  // Record the answer and, on the *final* one, fire the narrative call
+  // immediately — the earliest possible moment, so the request overlaps the
+  // whole thinking beat and the reveal rarely has to wait past it.
+  function handleAnswer(option: Option) {
+    const isFinal = answers.length + 1 >= questions.length;
+    send({ type: 'answer', option });
+    if (isFinal) narrative.start([...answers, option]);
+  }
+
+  function handleRetry() {
+    send({ type: 'retry' });
+    narrative.start(answers);
+  }
+
+  function handleRetake() {
+    narrative.reset();
+    send({ type: 'retake' });
+  }
+
+  // Final beat blocks the reveal on the narrative: advance only once BOTH the
+  // minimum beat has elapsed (floorMet) and the fetch has settled — reveal on
+  // success, fail into the error state otherwise.
+  useEffect(() => {
+    if (!isFinalThinkingBeat || !floorMet) return;
+    if (narrative.status === 'ready') dispatch({ type: 'advance' });
+    else if (narrative.status === 'error') dispatch({ type: 'fail' });
+  }, [isFinalThinkingBeat, floorMet, narrative.status]);
+
+  // The floor is a per-beat latch; clear it whenever we're not in a beat so the
+  // next one (including a retry) starts fresh.
+  useEffect(() => {
+    if (step !== 'thinking') setFloorMet(false);
+  }, [step]);
+
   useEffect(() => {
     if (!hasUserNavigated.current || step === 'thinking') return;
 
@@ -64,7 +109,9 @@ export function Quiz() {
         ? startHeadingRef.current
         : step === 'quiz'
           ? questionHeadingRef.current
-          : resultHeadingRef.current;
+          : step === 'error'
+            ? errorHeadingRef.current
+            : resultHeadingRef.current;
 
     if (!target) return;
 
@@ -135,13 +182,17 @@ export function Quiz() {
         <AnimatePresence
           mode="popLayout"
           onExitComplete={() => {
-            // Thinking beat: the answered card is gone — dwell, then wind up.
-            if (step === 'thinking') {
-              clearTimeout(thinkTimer.current);
-              thinkTimer.current = setTimeout(
-                () => dispatch({ type: 'advance' }),
-                prefersReducedMotion ? REDUCED_THINK_DWELL_MS : THINK_DWELL_MS,
-              );
+            // A card just finished exiting into a beat. Non-final beats wind up
+            // on a fixed dwell; the final beat instead latches the *minimum*
+            // dwell and lets the gating effect above release the reveal once the
+            // narrative resolves. (Retry re-enters here when the error card exits.)
+            if (step !== 'thinking') return;
+            clearTimeout(thinkTimer.current);
+            const dwell = prefersReducedMotion ? REDUCED_THINK_DWELL_MS : THINK_DWELL_MS;
+            if (isFinalThinkingBeat) {
+              thinkTimer.current = setTimeout(() => setFloorMet(true), dwell);
+            } else {
+              thinkTimer.current = setTimeout(() => dispatch({ type: 'advance' }), dwell);
             }
           }}
         >
@@ -152,15 +203,24 @@ export function Quiz() {
               index={index}
               total={questions.length}
               headingRef={questionHeadingRef}
-              onAnswer={(option) => send({ type: 'answer', option })}
+              onAnswer={handleAnswer}
             />
           )}
           {step === 'result' && winner && (
             <ResultCard
               key="result"
               species={winner}
+              narrative={narrative.narrative ?? undefined}
               headingRef={resultHeadingRef}
-              onRetake={() => send({ type: 'retake' })}
+              onRetake={handleRetake}
+            />
+          )}
+          {step === 'error' && (
+            <ResultError
+              key="error"
+              headingRef={errorHeadingRef}
+              onRetry={handleRetry}
+              onRetake={handleRetake}
             />
           )}
         </AnimatePresence>

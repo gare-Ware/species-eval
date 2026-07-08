@@ -23,6 +23,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
     "motion": "^12.40.0",
     "next": "15.5.19",
     "react": "19.1.0",

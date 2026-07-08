@@ -3,18 +3,19 @@
 // dispatch events; timing side effects (the choreography beats) stay in Quiz.
 //
 //   start → (begin) → quiz ⇄ thinking → result → (retake) → start
+//                              │
+//                              └→ (fail) → error ⇄ (retry) → thinking
 //
 // 'thinking' is the between-question beat: the content island is empty while
-// the blob enlarges and recenters.
-//
-// Phase-3 seam: the AI narrative call lands here — fire the fetch on the last
-// 'answer', dispatch 'advance' from Promise.all([minDwell, fetch]) so the
-// reveal choreography absorbs the latency.
+// the blob enlarges and recenters. On the FINAL beat it also covers the AI
+// narrative call — Quiz blocks the 'advance' to 'result' until the narrative
+// resolves, or dispatches 'fail' to 'error' if it doesn't. 'error' offers a
+// 'retry' (back into the blocking beat) or a 'retake'.
 
 import type { Option } from '@/data/questions';
 import { questions } from '@/data/questions';
 
-export type Step = 'start' | 'quiz' | 'thinking' | 'result';
+export type Step = 'start' | 'quiz' | 'thinking' | 'result' | 'error';
 
 export interface QuizFlow {
   step: Step;
@@ -28,7 +29,9 @@ export interface QuizFlow {
 export type QuizEvent =
   | { type: 'begin' } // the blob tapped on the start screen
   | { type: 'answer'; option: Option }
-  | { type: 'advance' } // thinking beat over: next question, or the result
+  | { type: 'advance' } // thinking beat over (narrative ready): next question, or the result
+  | { type: 'fail' } // the final beat's narrative call failed
+  | { type: 'retry' } // from the error state, re-enter the blocking beat
   | { type: 'retake' };
 
 export const INITIAL_FLOW: QuizFlow = { step: 'start', answers: [] };
@@ -49,6 +52,15 @@ export function quizFlowReducer(state: QuizFlow, event: QuizEvent): QuizFlow {
         ...state,
         step: state.answers.length >= questions.length ? 'result' : 'quiz',
       };
+    case 'fail':
+      // Guard: only the (final) thinking beat can fail into the error state.
+      if (state.step !== 'thinking') return state;
+      return { ...state, step: 'error' };
+    case 'retry':
+      // Guard: retry re-enters the blocking beat from the error state only. The
+      // answers are already complete, so this lands straight on the final beat.
+      if (state.step !== 'error') return state;
+      return { ...state, step: 'thinking' };
     case 'retake':
       return INITIAL_FLOW;
   }
