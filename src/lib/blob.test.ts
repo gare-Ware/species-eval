@@ -84,6 +84,55 @@ describe('blobPoints', () => {
   });
 });
 
+describe('weight', () => {
+  // theta = (i / points) · 2π, +y down in SVG space: bottom = points/4.
+  const BOTTOM = BLOB.points / 4;
+  const TOP = (3 * BLOB.points) / 4;
+  const radiusAt = (pts: [number, number][], i: number) => Math.hypot(pts[i][0], pts[i][1]);
+
+  // Waves zeroed via cfg so the structural read isn't swamped by shimmer
+  // noise — the sag/breathe coupling is the system under test.
+  const STRUCTURE = { ...BLOB, waves: [] as typeof BLOB.waves };
+
+  it('rests heavier at the base through the whole breath', () => {
+    for (const frac of [0, 0.25, 0.5, 0.75]) {
+      const pts = blobPoints(frac * BLOB.breathe.period, BLOB_AT_REST, STRUCTURE);
+      expect(radiusAt(pts, BOTTOM)).toBeGreaterThan(radiusAt(pts, TOP));
+    }
+  });
+
+  it('pools on the exhale — the bulge deepens at the bottom of the breath', () => {
+    // 0.75 × period = deepest exhale, 0.25 = fullest inhale. The uniform
+    // breathe term cancels in the bottom−top difference; what remains is the
+    // mass visibly settling as the breath releases.
+    const bulge = (frac: number) => {
+      const pts = blobPoints(frac * BLOB.breathe.period, BLOB_AT_REST, STRUCTURE);
+      return radiusAt(pts, BOTTOM) - radiusAt(pts, TOP);
+    };
+    expect(bulge(0.75)).toBeGreaterThan(bulge(0.25));
+  });
+
+  it('keeps the base calm — the crown shimmers harder than the pooled mass', () => {
+    // Breathe and the sag coupling zeroed via cfg: the remaining radius
+    // variance over time is pure shimmer, which the calm gradient must damp
+    // at the base relative to the crown.
+    const SHIMMER = {
+      ...BLOB,
+      breathe: { ...BLOB.breathe, amp: 0 },
+      sag: { ...BLOB.sag, breathe: 0 },
+    };
+    const std = (index: number) => {
+      const samples: number[] = [];
+      for (let t = 0; t < 12; t += 0.05) {
+        samples.push(radiusAt(blobPoints(t, BLOB_AT_REST, SHIMMER), index));
+      }
+      const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+      return Math.sqrt(samples.reduce((a, b) => a + (b - mean) ** 2, 0) / samples.length);
+    };
+    expect(std(TOP)).toBeGreaterThan(1.5 * std(BOTTOM));
+  });
+});
+
 describe('pulseSwell', () => {
   it('is silent before the pulse and after the ring has decayed', () => {
     expect(pulseSwell(-1)).toBe(0);

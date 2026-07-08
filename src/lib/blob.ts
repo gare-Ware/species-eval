@@ -17,7 +17,11 @@
 //               overcorrecting), rings down. While a lobe pushes out the rest
 //               of the shell pulls in (counter): the same energy redistributed,
 //               never the ball growing
-//   sag       — light resting bottom bulge, so the ball still has weight
+//   sag       — the weight system: a bottom bulge that POOLS ON THE EXHALE
+//               (mass settles as the breath releases) plus a calm-base shimmer
+//               gradient (the energy crackles at the crown; the dense mass at
+//               the base barely stirs). Weight read as behavior, not just shape
+//               — a static bulge alone measured ~1–2px and read as nothing
 //   velocity  — travel: the shell sits `lag` behind the true center, a broad
 //               wake trails it (drag), and the trailing hemisphere shimmers
 //               harder (streak) — the energy sags behind the glide while the
@@ -114,6 +118,17 @@ export const BLOB = {
     omega: 9, // fight frequency: crest ~0.17s, dent ~0.5s, spent ~1s
     decay: 3.2, // envelope die-off (1/s)
     gap: [0.9, 2.4] as [number, number], // seconds between spawns at idle
+    /**
+     * Direction bias (sampling lives in Blob.tsx): flares erupt where the
+     * energy already is. At rest they favor the crown — the dense mass at the
+     * base doesn't erupt downward — and during travel they chase the wake,
+     * where the streak says the energy is streaming. Triangular spread around
+     * the bias center; wider = looser aim, ~π = almost uniform.
+     */
+    bias: {
+      travel: 300, // tracked px/s above which the wake, not the sky, is the target
+      spread: [1.2, 2.2] as [number, number], // radians around the center: [traveling, at rest]
+    },
     /** Soft cap (soften()) on the summed outward push, so stacked flares can't spike. */
     maxTotal: 0.12,
     /**
@@ -124,8 +139,16 @@ export const BLOB = {
     counter: 2,
   },
 
-  /** Resting weight: a light bottom bulge so the sphere still sits in gravity. */
-  sag: 0.03,
+  /**
+   * Resting weight, read through behavior rather than a fixed bulge:
+   *   amp     — bottom bulge scale (the mass pooled at the base)
+   *   breathe — fraction of amp swung by the breath phase: the bulge grows as
+   *             the ball exhales (mass settling) and eases as it inhales —
+   *             conservation, so the weight reads as the SAME energy sinking
+   *   calm    — shimmer damping at the base (0–1): the crown crackles, the
+   *             dense base barely stirs. The contrast is the legible part.
+   */
+  sag: { amp: 0.05, breathe: 0.6, calm: 0.5 },
 
   /**
    * Churn. Blob.tsx accumulates |Δspeed| × gain into a 0–1 level that decays
@@ -133,8 +156,12 @@ export const BLOB = {
    * Blob.tsx it shortens the flare gap (flareRate): the energy fights hardest
    * right after being dragged around. Arrival from a glide is the big shove —
    * the ball visibly roils as it regroups, then settles back to a simmer.
+   * kick: instant charge injected by pointer engagement (Blob.tsx) — the
+   * energy bristles when a hand approaches the containment; press pushes
+   * harder. Transient and shimmer-only, so the sustained hover scale stays
+   * the loudest cue (the ambient-vs-interactive ranking).
    */
-  agitation: { gain: 1 / 2600, tau: 0.55, waveGain: 0.7, flareRate: 0.55 },
+  agitation: { gain: 1 / 2600, tau: 0.55, waveGain: 0.7, flareRate: 0.55, kick: { hover: 0.3, press: 0.5 } },
 
   /** Travel streak: extra trailing-hemisphere shimmer, ∝ normalized wake. */
   streak: 0.8,
@@ -238,7 +265,11 @@ export function soften(raw: number, max: number): number {
 
 /** Perimeter points at time t (seconds), in unit space (rest radius 1). */
 export function blobPoints(t: number, deform: BlobDeform, cfg: BlobConfig = BLOB): [number, number][] {
-  const breathe = cfg.breathe.amp * Math.sin((2 * Math.PI * t) / cfg.breathe.period);
+  const breathePhase = Math.sin((2 * Math.PI * t) / cfg.breathe.period);
+  const breathe = cfg.breathe.amp * breathePhase;
+  // Weight: the bulge pools on the exhale (phase < 0) and eases on the inhale —
+  // the mass visibly settles with each breath instead of sitting frozen.
+  const sagAmp = cfg.sag.amp * (1 - cfg.sag.breathe * breathePhase);
   const lag = soften(deform.lag, cfg.maxLag);
   const drag = soften(deform.drag, cfg.maxDrag);
   const dragNorm = drag / cfg.maxDrag; // 0..1 travel intensity, shared by the streak
@@ -269,21 +300,26 @@ export function blobPoints(t: number, deform: BlobDeform, cfg: BlobConfig = BLOB
     const towards = Math.cos(theta) * ux + Math.sin(theta) * uy;
     // Backward-facing hemisphere mask, shared by the wake and the streak.
     const trail = Math.max(0, -towards);
+    // Downward mask (+y in SVG space), shared by the sag and the calm base.
+    const down = Math.max(0, Math.sin(theta));
 
     let r = 1 + breathe + (deform.swell ?? 0);
 
     // Shimmer: churn lifts it everywhere, the streak lifts the trailing side
-    // at speed (energy streams behind; the leading edge stays held spherical).
+    // at speed (energy streams behind; the leading edge stays held spherical),
+    // and the base stays calm — the crown crackles, the pooled mass barely
+    // stirs. The top/bottom contrast is what makes the weight legible.
     const boost = Math.min(churn + cfg.streak * dragNorm * trail, cfg.maxBoost);
+    const calm = 1 - cfg.sag.calm * down * down;
     for (let j = 0; j < cfg.waves.length; j++) {
       const w = cfg.waves[j];
-      r += waveAmp[j] * boost * Math.sin(w.lobes * theta + w.speed * t + w.phase);
+      r += waveAmp[j] * boost * calm * Math.sin(w.lobes * theta + w.speed * t + w.phase);
     }
 
-    // Gravity: bulge concentrated at the bottom (+y in SVG space), with a
-    // small global shrink so the sag reads as mass shifting, not growing.
-    const down = Math.max(0, Math.sin(theta));
-    r += cfg.sag * (down * down - 0.35);
+    // Gravity: bulge concentrated at the bottom, breathing with sagAmp (mass
+    // pools on the exhale), with a small global shrink so the sag reads as
+    // mass shifting, not growing.
+    r += sagAmp * (down * down - 0.35);
 
     // Escape attempts: each flare is a raised-cosine lobe riding its fight
     // envelope; the summed push is soft-capped, and the counter term pulls

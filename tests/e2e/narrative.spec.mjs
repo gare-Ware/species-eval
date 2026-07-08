@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const QUESTION_COUNT = 6;
-const OPTION_COUNT = 5;
+const OPTION_COUNT = 4;
 
 function currentQuestion(page) {
   return page.locator('section[aria-labelledby^="question-"]');

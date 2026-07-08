@@ -36,6 +36,12 @@ const DRIFT_SPEED_PER_PX = 2.2; // extra px/s per px of star size (the parallax 
 const TWINKLE_SECONDS: [number, number] = [2.5, 6.5];
 const TWINKLE_FLOOR = 0.25; // dimmest point of the twinkle, as a fraction of base opacity
 const DPR_CAP = 2; // don't rasterize above 2× on ultra-dense displays
+// Ambient frame budget: the sky redraws at ~30fps, not the display rate. The
+// fastest visible change is the big-star drift (~4px/s → ~0.13px per 33ms
+// frame, sub-pixel) and the theme fade (700ms → ~21 samples), so halving the
+// full-viewport clear+fill cost is invisible. 30ms (not 33) so a 60Hz display
+// cleanly lands on every other frame instead of occasionally skipping two.
+const DRAW_INTERVAL_MS = 30;
 
 function mulberry32(seed: number) {
   return () => {
@@ -96,13 +102,16 @@ export function Starscape() {
     };
     reduced.addEventListener('change', unsettle);
 
+    let lastDraw = -Infinity;
     const draw = (now: number) => {
       raf = requestAnimationFrame(draw);
       const still = reduced.matches;
+      if (!still && now - lastDraw < DRAW_INTERVAL_MS) return; // ambient 30fps cap
       // The computed color interpolates through the CSS --theme-fade
       // transition on the canvas element itself — the takeover tint for free.
       const color = getComputedStyle(canvas).color;
       if (still && settled && color === lastColor) return;
+      lastDraw = now;
       lastColor = color;
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
